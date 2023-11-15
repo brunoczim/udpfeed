@@ -17,10 +17,8 @@ class InvalidUdpPort : public std::exception {
         virtual const char *what() const noexcept;
 };
 
-typedef uint16_t UdpPort;
+uint16_t parse_udp_port(char const *content);
 
-UdpPort parse_udp_port(char const *content);
-
-UdpPort parse_udp_port(std::string const& content);
+uint16_t parse_udp_port(std::string const& content);
 
 #endif

@@ -6,7 +6,7 @@
 
 struct Arguments {
     std::string bind_address;
-    UdpPort bind_port;
+    uint16_t bind_port;
 };
 
 void print_help(void);

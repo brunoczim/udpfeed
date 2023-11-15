@@ -16,11 +16,11 @@ const char *InvalidUdpPort::what() const noexcept
     return message.c_str();
 }
 
-UdpPort parse_udp_port(char const *content)
+uint16_t parse_udp_port(char const *content)
 {
     int parsed_int;
     size_t parse_end_pos;
-    UdpPort port = 0;
+    uint16_t port = 0;
     try {
         parsed_int = std::stoi(content, &parse_end_pos);
         if (parse_end_pos == 0) {
@@ -41,7 +41,7 @@ UdpPort parse_udp_port(char const *content)
     return port;
 }
 
-UdpPort parse_udp_port(std::string const& content)
+uint16_t parse_udp_port(std::string const& content)
 {
     return parse_udp_port(content.c_str());
 }
