@@ -25,6 +25,8 @@ class MessageSerializer {
         MessageSerializer& operator<<(std::string const& data);
 
         MessageSerializer& operator<<(uint64_t data);
+
+        MessageSerializer& operator<<(int64_t data);
 };
 
 class MessageDeserializer {
@@ -37,6 +39,8 @@ class MessageDeserializer {
         MessageDeserializer& operator>>(std::string &data);
 
         MessageDeserializer& operator>>(uint64_t &data);
+
+        MessageDeserializer& operator>>(int64_t &data);
 
     private:
         uint8_t next();

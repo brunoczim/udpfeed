@@ -81,11 +81,11 @@ bool TestSuite::run()
         std::cerr << test_case.name() << "..." << std::flush;
         try {
             test_case.run();
-            std::cerr << "Success" << std::endl;
+            std::cerr << " Passed" << std::endl;
             successes++;
         } catch (std::exception const& failure) {
             std::cerr
-                << "Failed"
+                << " Failed"
                 << std::endl
                 << std::endl
                 << failure.what()

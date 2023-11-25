@@ -18,7 +18,7 @@ std::vector<uint8_t> const& MessageSerializer::finish() const
 
 MessageSerializer& MessageSerializer::operator<<(char const *data)
 {
-    for (size_t i; data[i] != 0; i++) {
+    for (size_t i = 0; data[i] != 0; i++) {
         switch (data[i]) {
             case ';':
             case '\\':
@@ -46,6 +46,14 @@ MessageSerializer& MessageSerializer::operator<<(uint64_t data)
     return *this;
 }
 
+MessageSerializer& MessageSerializer::operator<<(int64_t data)
+{
+    std::stringstream sstream;
+    sstream << data;
+    *this << sstream.str();
+    return *this;
+}
+
 MessageDeserializer::MessageDeserializer(std::vector<uint8_t> const& bytes) :
     bytes(bytes)
 {
@@ -65,6 +73,15 @@ MessageDeserializer& MessageDeserializer::operator>>(std::string &data)
 }
 
 MessageDeserializer& MessageDeserializer::operator>>(uint64_t& data)
+{
+    std::string buf;
+    *this >> buf;
+    std::istringstream istream(buf);
+    istream >> data;
+    return *this;
+}
+
+MessageDeserializer& MessageDeserializer::operator>>(int64_t& data)
 {
     std::string buf;
     *this >> buf;
