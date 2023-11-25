@@ -8,8 +8,8 @@
 #include <optional>
 #include <functional>
 
-#define TEST_ASSERT(cond, msg) \
-    test_assert_impl((cond), (msg), __FILE__, __LINE__)
+#define TEST_ASSERT(msg, cond) \
+    test_assert_impl((msg), (cond), __FILE__, __LINE__)
 
 class TestFailure : public std::exception {
     private:
@@ -54,12 +54,14 @@ class TestSuite {
         template <typename F>
         TestSuite& test(std::string const& name, F test);
 
+        TestSuite& append(TestSuite const& subsuite);
+
         bool run();
 };
 
 void test_assert_impl(
-    bool condition,
     std::string const& message,
+    bool condition,
     char const *filename,
     int line_number
 );
