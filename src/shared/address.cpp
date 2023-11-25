@@ -18,11 +18,10 @@ const char *InvalidUdpPort::what() const noexcept
 
 uint16_t parse_udp_port(char const *content)
 {
-    int parsed_int;
-    size_t parse_end_pos;
     uint16_t port = 0;
     try {
-        parsed_int = std::stoi(content, &parse_end_pos);
+        size_t parse_end_pos = 0;
+        int parsed_int = std::stoi(content, &parse_end_pos);
         if (parse_end_pos == 0) {
             throw InvalidUdpPort(content, "must contain a digit");
         }

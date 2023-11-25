@@ -13,6 +13,7 @@ void print_help(void);
 
 Arguments parse_arguments(int argc, char const *argv[]);
 
+
 int main(int argc, char const *argv[])
 {
     Arguments arguments = parse_arguments(argc, argv);
