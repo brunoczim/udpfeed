@@ -43,7 +43,7 @@ static TestSuite parse_udp_port_test_suite()
                 throwed = true;
             }
             TEST_ASSERT(
-                std::string("should throw, but found") + std::to_string(actual),
+                std::string("should throw, but found ") + std::to_string(actual),
                 throwed
             );
         })
@@ -57,7 +57,7 @@ static TestSuite parse_udp_port_test_suite()
                 throwed = true;
             }
             TEST_ASSERT(
-                std::string("should throw, but found") + std::to_string(actual),
+                std::string("should throw, but found ") + std::to_string(actual),
                 throwed
             );
         })
@@ -71,7 +71,7 @@ static TestSuite parse_udp_port_test_suite()
                 throwed = true;
             }
             TEST_ASSERT(
-                std::string("should throw, but found") + std::to_string(actual),
+                std::string("should throw, but found ") + std::to_string(actual),
                 throwed
             );
         })
@@ -172,6 +172,32 @@ static TestSuite deserializer_test_suite()
             TEST_ASSERT(
                 std::string("field 4, found: ") + fields[4],
                 fields[4] == "The\\; End" 
+            );
+        })
+
+        .test("deserialize past beyond end error", [] {
+            std::string message = "2;" ;
+            MessageDeserializer deserializer(message);
+
+            int64_t int_field;
+            uint64_t actual = 0;
+
+            deserializer >> int_field;
+
+            bool throwed = false;
+            try {
+                 deserializer >> actual;
+            } catch (InvalidMessagePayload const &exception) {
+                throwed = true;
+            }
+
+            TEST_ASSERT(
+                std::string("int field, found: ") + std::to_string(int_field),
+                int_field == 2
+            );
+            TEST_ASSERT(
+                std::string("should throw, but found ") + std::to_string(actual),
+                throwed
             );
         })
     ;
