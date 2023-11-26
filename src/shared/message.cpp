@@ -101,6 +101,10 @@ uint8_t MessageDeserializer::next()
     return byte;
 }
 
-MessagePayload::~MessagePayload()
+Serializable::~Serializable()
+{
+}
+
+MessageBody::~MessageBody()
 {
 }

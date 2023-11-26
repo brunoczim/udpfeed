@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <memory>
 
 class InvalidMessagePayload: public std::exception {
     private:
@@ -45,12 +46,34 @@ class MessageDeserializer {
         uint8_t next();
 };
 
-class MessagePayload {
-    virtual void serialize(MessageSerializer& MessageSerializer) const = 0;
+class Serializable {
+    public:
+        virtual void serialize(MessageSerializer& MessageSerializer) const = 0;
 
-    virtual void deserialize(MessageDeserializer& MessageDeserializer) = 0;
+        virtual void deserialize(MessageDeserializer& MessageDeserializer) = 0;
 
-    virtual ~MessagePayload();
+        virtual ~Serializable();
+};
+
+enum MessageType {
+    MSG_CONNECT_REQ,
+    MSG_CONNECT_RESP
+};
+
+struct MessageHeader {
+    uint64_t seqn;
+    uint64_t timestamp;
+};
+
+class MessageBody : public Serializable {
+    public:
+        virtual MessageType type() = 0;
+        virtual ~MessageBody();
+};
+
+struct Message {
+    MessageHeader header;
+    std::shared_ptr<MessageBody> body;
 };
 
 #endif
