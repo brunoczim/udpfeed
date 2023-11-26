@@ -2,7 +2,6 @@
 #define SHARED_MESSAGE_H_ 1
 
 #include <cstdint>
-#include <vector>
 #include <string>
 
 class InvalidMessagePayload: public std::exception {
@@ -16,9 +15,9 @@ class InvalidMessagePayload: public std::exception {
 
 class MessageSerializer {
     private:
-        std::vector<uint8_t> bytes;
+        std::string bytes;
     public:
-        std::vector<uint8_t> const& finish() const;
+        std::string const& finish() const;
 
         MessageSerializer& operator<<(char const *data);
 
@@ -31,10 +30,10 @@ class MessageSerializer {
 
 class MessageDeserializer {
     private:
-        std::vector<uint8_t> const& bytes;
+        std::string const& bytes;
         size_t i;
     public:
-        MessageDeserializer(std::vector<uint8_t> const& bytes);
+        MessageDeserializer(std::string const& bytes);
 
         MessageDeserializer& operator>>(std::string &data);
 

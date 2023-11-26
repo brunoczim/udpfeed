@@ -11,7 +11,7 @@ const char *InvalidMessagePayload::what() const noexcept
     return this->error_message.c_str();
 }
 
-std::vector<uint8_t> const& MessageSerializer::finish() const
+std::string const& MessageSerializer::finish() const
 {
     return this->bytes;
 }
@@ -54,8 +54,9 @@ MessageSerializer& MessageSerializer::operator<<(int64_t data)
     return *this;
 }
 
-MessageDeserializer::MessageDeserializer(std::vector<uint8_t> const& bytes) :
-    bytes(bytes)
+MessageDeserializer::MessageDeserializer(std::string const& bytes) :
+    bytes(bytes),
+    i(0)
 {
 }
 
