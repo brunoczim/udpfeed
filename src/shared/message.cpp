@@ -1,5 +1,7 @@
 #include "message.h"
 #include <sstream>
+#include <ctime>
+#include <atomic>
 
 InvalidMessagePayload::InvalidMessagePayload(std::string const& error_message) :
     error_message(error_message)
@@ -105,6 +107,53 @@ Serializable::~Serializable()
 {
 }
 
+MessageHeader MessageHeader::create()
+{
+    static std::atomic<uint64_t> current_seqn = 0;
+    MessageHeader header;
+    header.seqn = current_seqn.fetch_add(1);
+    header.timestamp = time(NULL);
+    return header;
+}
+
+void MessageHeader::serialize(MessageSerializer& serializer) const
+{
+    serializer << this->seqn << this->timestamp;
+}
+
+void MessageHeader::deserialize(MessageDeserializer& deserializer)
+{
+    deserializer >> this->seqn >> this->timestamp;
+}
+
 MessageBody::~MessageBody()
 {
+}
+
+void Message::serialize(MessageSerializer& serializer) const
+{
+    serializer << this->header << *this->body;
+}
+
+void Message::deserialize(MessageDeserializer& deserializer)
+{
+    deserializer >> this->header >> *this->body;
+}
+
+MessageSerializer& operator<<(
+    MessageSerializer& serializer,
+    Serializable const& serializable
+)
+{
+    serializable.serialize(serializer);
+    return serializer;
+}
+
+MessageDeserializer& operator>>(
+    MessageDeserializer& deserializer,
+    Serializable& serializable
+)
+{
+    serializable.deserialize(deserializer);
+    return deserializer;
 }

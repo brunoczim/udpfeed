@@ -48,9 +48,9 @@ class MessageDeserializer {
 
 class Serializable {
     public:
-        virtual void serialize(MessageSerializer& MessageSerializer) const = 0;
+        virtual void serialize(MessageSerializer& serializer) const = 0;
 
-        virtual void deserialize(MessageDeserializer& MessageDeserializer) = 0;
+        virtual void deserialize(MessageDeserializer& deserializer) = 0;
 
         virtual ~Serializable();
 };
@@ -60,9 +60,15 @@ enum MessageType {
     MSG_CONNECT_RESP
 };
 
-struct MessageHeader {
+struct MessageHeader : public Serializable {
     uint64_t seqn;
     uint64_t timestamp;
+
+    static MessageHeader create();
+
+    virtual void serialize(MessageSerializer& serializer) const;
+
+    virtual void deserialize(MessageDeserializer& deserializer);
 };
 
 class MessageBody : public Serializable {
@@ -71,9 +77,23 @@ class MessageBody : public Serializable {
         virtual ~MessageBody();
 };
 
-struct Message {
+struct Message : public Serializable {
     MessageHeader header;
     std::shared_ptr<MessageBody> body;
+
+    virtual void serialize(MessageSerializer& serializer) const;
+
+    virtual void deserialize(MessageDeserializer& deserializer);
 };
+
+MessageSerializer& operator<<(
+    MessageSerializer& serializer,
+    Serializable const& serializable
+);
+
+MessageDeserializer& operator>>(
+    MessageDeserializer& deserializer,
+    Serializable& serializable
+);
 
 #endif

@@ -21,4 +21,9 @@ uint16_t parse_udp_port(char const *content);
 
 uint16_t parse_udp_port(std::string const& content);
 
+struct Address {
+    uint32_t ipv4;
+    uint16_t port;
+};
+
 #endif
