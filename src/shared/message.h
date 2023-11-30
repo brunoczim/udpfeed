@@ -56,9 +56,45 @@ class Serializable {
 };
 
 enum MessageType {
+    MSG_REQ_ACK,
+    MSG_RESP_ACK,
     MSG_CONNECT_REQ,
     MSG_CONNECT_RESP
 };
+
+class InvalidMessageType : public std::exception {
+    private:
+        std::string message;
+        uint16_t code_;
+    public:
+        InvalidMessageType(uint16_t code);
+
+        uint16_t code() const;
+
+        virtual const char *what() const noexcept;
+};
+
+MessageType msg_type_from_code(uint16_t code);
+
+enum MessageStatus {
+    MSG_OK,
+    MSG_BAD_USERNAME,
+    MSG_TOO_MANY_SESSIONS
+};
+
+class InvalidMessageStatus : public std::exception {
+    private:
+        std::string message;
+        uint16_t code_;
+    public:
+        InvalidMessageStatus(uint16_t code);
+
+        uint16_t code() const;
+
+        virtual const char *what() const noexcept;
+};
+
+MessageStatus msg_status_from_code(uint16_t code);
 
 struct MessageHeader : public Serializable {
     uint64_t seqn;
@@ -75,6 +111,52 @@ class MessageBody : public Serializable {
     public:
         virtual MessageType type() = 0;
         virtual ~MessageBody();
+};
+
+class MessageConnectReq : public MessageBody {
+    public:
+        std::string username;
+
+        MessageConnectReq();
+        MessageConnectReq(std::string username);
+
+        virtual MessageType type();
+
+        virtual void serialize(MessageSerializer& serializer) const;
+
+        virtual void deserialize(MessageDeserializer& deserializer);
+};
+
+class MessageConnectResp : public MessageBody {
+    public:
+        MessageStatus status;
+
+        MessageConnectResp();
+        MessageConnectResp(MessageStatus status);
+
+        virtual MessageType type();
+
+        virtual void serialize(MessageSerializer& serializer) const;
+
+        virtual void deserialize(MessageDeserializer& deserializer);
+};
+
+class MessageReqAck : public MessageBody {
+    public:
+        virtual MessageType type();
+
+        virtual void serialize(MessageSerializer& serializer) const;
+
+        virtual void deserialize(MessageDeserializer& deserializer);
+};
+
+class MessageRespAck : public MessageBody {
+    public:
+        virtual MessageType type();
+
+        virtual void serialize(MessageSerializer& serializer) const;
+
+        virtual void deserialize(MessageDeserializer& deserializer);
 };
 
 struct Message : public Serializable {

@@ -1,10 +1,12 @@
 #include "shared.h"
 #include "../shared/address.h"
 #include "../shared/message.h"
+#include "../shared/socket.h"
 
 static TestSuite parse_udp_port_test_suite();
 static TestSuite serializer_test_suite();
 static TestSuite deserializer_test_suite();
+static TestSuite socket_test_suite();
 
 TestSuite shared_test_suite()
 {
@@ -12,6 +14,7 @@ TestSuite shared_test_suite()
         .append(parse_udp_port_test_suite())
         .append(serializer_test_suite())
         .append(deserializer_test_suite())
+        .append(socket_test_suite())
     ;
 }
 
@@ -199,6 +202,146 @@ static TestSuite deserializer_test_suite()
                 std::string("should throw, but found ") + std::to_string(actual),
                 throwed
             );
+        })
+    ;
+}
+
+static TestSuite socket_test_suite()
+{
+    return TestSuite()
+        .test("basic send and receive", [] {
+            Socket client(500);
+            Socket server(500, 8082);
+            Message message;
+            message.header = MessageHeader::create();
+            message.body = std::shared_ptr<MessageConnectReq>(
+                new MessageConnectReq("bruno")
+            );
+            client.send(message, Address(make_ipv4({ 127, 0, 0, 1 }), 8082));
+
+            Address sender_addr;
+            Message received = server.receive(sender_addr);
+
+            TEST_ASSERT(
+                std::string("basic recevied ipv4 address is wrong, address: ")
+                    + sender_addr.to_string(),
+                sender_addr.ipv4 == make_ipv4({ 127, 0, 0, 1 })
+            );
+
+            TEST_ASSERT(
+                std::string("basic recevied port is wrong, address: ")
+                    + sender_addr.to_string(),
+                sender_addr.port != 8082
+            );
+
+            TEST_ASSERT(
+                "message type should be MSG_CONNECT_REQ, found: "
+                    + std::to_string(received.body->type()),
+                received.body->type() == MSG_CONNECT_REQ
+            );
+
+            MessageConnectReq const& casted_body =
+                dynamic_cast<MessageConnectReq const&>(*received.body);
+
+            TEST_ASSERT(
+                "message username should be \"bruno\", found: "
+                    + casted_body.username,
+                casted_body.username == "bruno"
+            );
+        })
+
+        .test("full message workflow", [] {
+            Socket client(500);
+            Socket server(500, 8082);
+
+            Message request;
+            request.header = MessageHeader::create();
+            request.body = std::shared_ptr<MessageConnectReq>(
+                new MessageConnectReq("bruno")
+            );
+            client.send(request, Address(make_ipv4({ 127, 0, 0, 1 }), 8082));
+
+            Address req_sender_addr;
+            Message received_req = server.receive(req_sender_addr);
+
+            TEST_ASSERT(
+                "message type should be MSG_CONNECT_REQ, found: "
+                    + std::to_string(received_req.body->type()),
+                received_req.body->type() == MSG_CONNECT_REQ
+            );
+
+            MessageConnectReq const& casted_req_body =
+                dynamic_cast<MessageConnectReq const&>(*received_req.body);
+
+            TEST_ASSERT(
+                "message username should be \"bruno\", found: "
+                    + casted_req_body.username,
+                casted_req_body.username == "bruno"
+            );
+
+            Message request_ack;
+            request_ack.header = MessageHeader::create();
+            request_ack.header.seqn = received_req.header.seqn;
+            request_ack.body =
+                std::shared_ptr<MessageReqAck>(new MessageReqAck);
+            server.send(request_ack, req_sender_addr);
+
+            Address req_ack_sender_addr;
+            Message received_req_ack = client.receive(req_ack_sender_addr);
+
+            TEST_ASSERT(
+                "message type should be MSG_REQ_ACK, found: "
+                    + std::to_string(received_req_ack.body->type()),
+                received_req_ack.body->type() == MSG_REQ_ACK
+            );
+
+            MessageReqAck const& casted_req_ack_body_ =
+                dynamic_cast<MessageReqAck const&>(*received_req_ack.body);
+
+            Message response;
+            response.header = MessageHeader::create();
+            response.header.seqn = received_req.header.seqn;
+            response.body = std::shared_ptr<MessageConnectResp>(
+                new MessageConnectResp(MSG_OK)
+            );
+            server.send(response, req_sender_addr);
+
+            Address resp_sender_addr;
+            Message received_resp = client.receive(resp_sender_addr);
+
+            TEST_ASSERT(
+                "message type should be MSG_CONNECT_RESP, found: "
+                    + std::to_string(received_resp.body->type()),
+                received_resp.body->type() == MSG_CONNECT_RESP
+            );
+
+            MessageConnectResp const& casted_resp_body =
+                dynamic_cast<MessageConnectResp const&>(*received_resp.body);
+
+            TEST_ASSERT(
+                "message status should be MSG_OK, found: "
+                    + casted_resp_body.status,
+                casted_resp_body.status == MSG_OK
+            );
+
+            Message response_ack;
+            response_ack.header = MessageHeader::create();
+            response_ack.header.seqn = received_resp.header.seqn;
+            response_ack.body =
+                std::shared_ptr<MessageRespAck>(new MessageRespAck);
+            client.send(response_ack, resp_sender_addr);
+
+            Address resp_ack_sender_addr;
+            Message received_resp_ack = server.receive(resp_ack_sender_addr);
+
+            TEST_ASSERT(
+                "message type should be MSG_RESP_ACK, found: "
+                    + std::to_string(received_resp_ack.body->type()),
+                received_resp_ack.body->type() == MSG_RESP_ACK
+            );
+
+            MessageRespAck const& casted_resp_ack_body_ =
+                dynamic_cast<MessageRespAck const&>(*received_resp_ack.body);
         })
     ;
 }

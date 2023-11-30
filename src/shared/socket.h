@@ -38,6 +38,7 @@ class Socket {
     public:
         Socket(size_t max_message_size);
         Socket(size_t max_message_size, uint16_t port);
+        Socket(Socket&& other);
         Socket(const Socket& obj) = delete;
         Socket& operator=(const Socket& obj) = delete;
 
@@ -48,10 +49,6 @@ class Socket {
         );
 
         void send(Message const& message, Address const& receiver_addr);
-        void send(
-            std::shared_ptr<MessageBody> const& message_body,
-            Address const& receiver_addr
-        );
 
         ~Socket();
 };
