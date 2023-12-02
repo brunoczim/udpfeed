@@ -62,6 +62,14 @@ Deserializer::~Deserializer()
 {
 }
 
+Serializable::~Serializable()
+{
+}
+
+Deserializable::~Deserializable()
+{
+}
+
 PlaintextSerializer::PlaintextSerializer(std::ostream& stream) :
     Serializer(stream)
 {
@@ -131,30 +139,63 @@ Serializer& PlaintextSerializer::operator<<(std::string const& data)
     return *this;
 }
 
+PlaintextInvalidInt::PlaintextInvalidInt(
+    std::string const& type,
+    std::string const& content
+) :
+    DeserializationError(
+        "found invalid integer " + content + " for type " + type
+    ),
+    type_(type),
+    content_(content)
+{
+}
+
+char const *PlaintextInvalidInt::type() const
+{
+    return this->type_.c_str();
+}
+
+char const *PlaintextInvalidInt::content() const
+{
+    return this->content_.c_str();
+}
+
+PlaintextDeserializer::PlaintextDeserializer(std::istream& stream) :
+    Deserializer(stream)
+{
+}
+
 Deserializer& PlaintextDeserializer::operator>>(uint8_t& data)
 {
-    std::string buf;
-    *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
+    uint64_t bigger;
+    *this >> bigger;
+    if (bigger > UINT8_MAX) {
+        throw PlaintextInvalidInt("uint8", std::to_string(bigger));
+    }
+    data = bigger;
     return *this;
 }
 
 Deserializer& PlaintextDeserializer::operator>>(uint16_t& data)
 {
-    std::string buf;
-    *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
+    uint64_t bigger;
+    *this >> bigger;
+    if (bigger > UINT16_MAX) {
+        throw PlaintextInvalidInt("uint16", std::to_string(bigger));
+    }
+    data = bigger;
     return *this;
 }
 
 Deserializer& PlaintextDeserializer::operator>>(uint32_t& data)
 {
-    std::string buf;
-    *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
+    uint64_t bigger;
+    *this >> bigger;
+    if (bigger > UINT32_MAX) {
+        throw PlaintextInvalidInt("uint32", std::to_string(bigger));
+    }
+    data = bigger;
     return *this;
 }
 
@@ -162,35 +203,48 @@ Deserializer& PlaintextDeserializer::operator>>(uint64_t& data)
 {
     std::string buf;
     *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
+    if (buf.empty()) {
+        throw PlaintextInvalidInt("uint64", buf);
+    }
+    char *end;
+    long long unsigned integer = strtoull(buf.c_str(), &end, 10);
+    if (*end != '\0') {
+        throw PlaintextInvalidInt("uint64", buf);
+    }
+    data = integer;
     return *this;
 }
 
 Deserializer& PlaintextDeserializer::operator>>(int8_t& data)
 {
-    std::string buf;
-    *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
+    int64_t bigger;
+    *this >> bigger;
+    if (bigger < INT8_MIN || bigger > INT8_MAX) {
+        throw PlaintextInvalidInt("int8", std::to_string(bigger));
+    }
+    data = bigger;
     return *this;
 }
 
 Deserializer& PlaintextDeserializer::operator>>(int16_t& data)
 {
-    std::string buf;
-    *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
+    int64_t bigger;
+    *this >> bigger;
+    if (bigger < INT16_MIN || bigger > INT16_MAX) {
+        throw PlaintextInvalidInt("int16", std::to_string(bigger));
+    }
+    data = bigger;
     return *this;
 }
 
 Deserializer& PlaintextDeserializer::operator>>(int32_t& data)
 {
-    std::string buf;
-    *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
+    int64_t bigger;
+    *this >> bigger;
+    if (bigger < INT32_MIN || bigger > INT32_MAX) {
+        throw PlaintextInvalidInt("int32", std::to_string(bigger));
+    }
+    data = bigger;
     return *this;
 }
 
@@ -198,8 +252,15 @@ Deserializer& PlaintextDeserializer::operator>>(int64_t& data)
 {
     std::string buf;
     *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
+    if (buf.empty()) {
+        throw PlaintextInvalidInt("int64", buf);
+    }
+    char *end;
+    long long signed integer = strtoll(buf.c_str(), &end, 10);
+    if (*end != '\0') {
+        throw PlaintextInvalidInt("int64", buf);
+    }
+    data = integer;
     return *this;
 }
 

@@ -91,13 +91,13 @@ class Deserializer {
 
 class Serializable {
     public:
-        virtual void serialize(Serializer& stream) const;
+        virtual void serialize(Serializer& stream) const = 0;
         virtual ~Serializable();
 };
 
 class Deserializable {
     public:
-        virtual void deserialize(Deserializer& stream);
+        virtual void deserialize(Deserializer& stream) = 0;
         virtual ~Deserializable();
 };
 
@@ -105,8 +105,8 @@ template <typename T>
 Serializer& Serializer::operator<<(std::vector<T> const& data)
 {
     *this << (uint16_t) data.size();
-    for (auto const& element : data) {
-        *this << data;
+    for (T const& element : data) {
+        *this << element;
     }
     return *this;
 }
@@ -117,7 +117,7 @@ Deserializer& Deserializer::operator>>(std::vector<T>& data)
     uint16_t size;
     *this >> size;
     data.resize(size);
-    for (auto& element : data) {
+    for (T& element : data) {
         *this >> element;
     }
     return *this;
@@ -138,6 +138,20 @@ class PlaintextSerializer : public Serializer {
         virtual Serializer& operator<<(int64_t data);
 
         virtual Serializer& operator<<(std::string const& data);
+};
+
+class PlaintextInvalidInt : public DeserializationError {
+    private:
+        std::string type_;
+        std::string content_;
+
+    public:
+        PlaintextInvalidInt(
+            std::string const& type,
+            std::string const& content
+        );
+        char const *type() const;
+        char const *content() const;
 };
 
 class PlaintextDeserializer : public Deserializer {

@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <iostream>
+#include <sstream>
 
 SocketIoError::SocketIoError(std::string const& message) :
     c_errno_(errno),
@@ -96,9 +97,11 @@ Message Socket::receive(Address &sender_addr_out)
 
     buf.resize(count);
 
-    MessageDeserializer deserializer(buf);
+    std::istringstream istream(buf);
+    PlaintextDeserializer deserializer_impl(istream);
+    Deserializer& deserializer = deserializer_impl;
     Message message;
-    message.deserialize(deserializer);
+    deserializer >> message;
     return message;
 }
 
@@ -120,10 +123,12 @@ std::optional<Message> Socket::receive(int timeout_ms, Address &sender_addr_out)
 
 void Socket::send(Message const& message, Address const& receiver_addr)
 {
-    MessageSerializer serializer;
-    message.serialize(serializer);
-    std::string const& buf = serializer.finish();
-
+    std::ostringstream ostream;
+    PlaintextSerializer serializer_impl(ostream);
+    Serializer& serializer = serializer_impl;
+    serializer << message;
+    std::string buf = ostream.str();
+    
     struct sockaddr_in receiver_addr_in;
 
     receiver_addr_in.sin_family = AF_INET;

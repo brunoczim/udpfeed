@@ -4,16 +4,16 @@
 #include "../shared/socket.h"
 
 static TestSuite parse_udp_port_test_suite();
-static TestSuite serializer_test_suite();
-static TestSuite deserializer_test_suite();
+static TestSuite plaintext_ser_test_suite();
+static TestSuite plaintext_de_test_suite();
 static TestSuite socket_test_suite();
 
 TestSuite shared_test_suite()
 {
     return TestSuite()
         .append(parse_udp_port_test_suite())
-        .append(serializer_test_suite())
-        .append(deserializer_test_suite())
+        .append(plaintext_ser_test_suite())
+        .append(plaintext_de_test_suite())
         .append(socket_test_suite())
     ;
 }
@@ -81,28 +81,42 @@ static TestSuite parse_udp_port_test_suite()
     ;
 }
 
-static TestSuite serializer_test_suite()
+static TestSuite plaintext_ser_test_suite()
 {
     return TestSuite()
         .test("serialize fields of all types", [] {
-            MessageSerializer serializer;
-            serializer << (int64_t) -79 << (uint64_t) 143 << "The End";
-            std::string actual = serializer.finish();
+            std::ostringstream ostream;
+            PlaintextSerializer serializer_impl(ostream);
+            Serializer& serializer = serializer_impl;
+            serializer
+                << (uint8_t) 138
+                << (uint16_t) 1243
+                << (uint32_t) 78679
+                << (uint64_t) 143
+                << (int8_t) -14
+                << "The End"
+                << (int16_t) -8430
+                << (int32_t) -32
+                << std::vector<int32_t> { -1, 3 }
+                << (int64_t) -79;
+            std::string actual = ostream.str();
             TEST_ASSERT(
                 std::string("found ") + actual,
-                actual == "-79;143;The End;"
+                actual == "138;1243;78679;143;-14;The End;-8430;-32;2;-1;3;-79;"
             );
         })
 
         .test("serialize strings with various escapes", [] {
-            MessageSerializer serializer;
+            std::ostringstream ostream;
+            PlaintextSerializer serializer_impl(ostream);
+            Serializer& serializer = serializer_impl;
             serializer
                 << "The End"
                 << "The; End"
                 << "The\\ End"
                 << "The\\\\ End"
                 << "The\\; End";
-            std::string actual = serializer.finish();
+            std::string actual = ostream.str();
             char const *expected =
                 "The End;The\\; End;The\\\\ End;The\\\\\\\\ End;The\\\\\\; End;"
             ;
@@ -114,38 +128,99 @@ static TestSuite serializer_test_suite()
     ;
 }
 
-static TestSuite deserializer_test_suite()
+
+static TestSuite plaintext_de_test_suite()
 {
     return TestSuite()
         .test("deserialize fields of all types", [] {
-            std::string message = "-79;143;The End;" ;
-            MessageDeserializer deserializer(message);
+            std::istringstream istream(
+                "138;1243;78679;143;-14;-8430;-32;The End;2;-1;3;-79;"
+            );
+            PlaintextDeserializer deserializer_impl(istream);
+            Deserializer& deserializer = deserializer_impl;
 
-            int64_t int_field;
-            uint64_t uint_field;
+            uint8_t u8_field;
+            uint16_t u16_field;
+            uint32_t u32_field;
+            uint64_t u64_field;
+            int8_t i8_field;
+            int16_t i16_field;
+            int32_t i32_field;
             std::string text_field;
+            std::vector<int16_t> vec_field;
+            int64_t i64_field;
 
-            deserializer >> int_field >> uint_field >> text_field;
+            deserializer
+                >> u8_field
+                >> u16_field
+                >> u32_field
+                >> u64_field
+                >> i8_field
+                >> i16_field
+                >> i32_field
+                >> text_field
+                >> vec_field
+                >> i64_field;
 
             TEST_ASSERT(
-                std::string("int field, found: ") + std::to_string(int_field),
-                int_field == -79
+                std::string("uint8 field, found ") + std::to_string(u8_field),
+                u8_field == 138
             );
             TEST_ASSERT(
-                std::string("uint field, found: ") + std::to_string(uint_field),
-                uint_field == 143
+                std::string("uint16 field, found ") + std::to_string(u16_field),
+                u16_field == 1243
             );
             TEST_ASSERT(
-                std::string("text field, found: ") + text_field,
+                std::string("uint32 field, found ") + std::to_string(u32_field),
+                u32_field == 78679
+            );
+            TEST_ASSERT(
+                std::string("uint64 field, found ") + std::to_string(u64_field),
+                u64_field == 143
+            );
+            TEST_ASSERT(
+                std::string("int8 field, found ") + std::to_string(i8_field),
+                i8_field == -14
+            );
+            TEST_ASSERT(
+                std::string("int16 field, found ") + std::to_string(i16_field),
+                i16_field == -8430
+            );
+            TEST_ASSERT(
+                std::string("int32 field, found ") + std::to_string(i32_field),
+                i32_field == -32
+            );
+            TEST_ASSERT(
+                std::string("text field, found ") + text_field,
                 text_field == "The End"
+            );
+            TEST_ASSERT(
+                std::string("vector field length, found ")
+                    + std::to_string(vec_field.size()),
+                vec_field.size() == 2
+            );
+            TEST_ASSERT(
+                std::string("vector field @ 0, found ")
+                    + std::to_string(vec_field[0]),
+                vec_field[0] == -1
+            );
+            TEST_ASSERT(
+                std::string("vector field @ 1, found ")
+                    + std::to_string(vec_field[1]),
+                vec_field[1] == 3
+            );
+            TEST_ASSERT(
+                std::string("int64 field, found ") + std::to_string(i64_field),
+                i64_field == -79
             );
         })
 
         .test("deserialize strings with various escapes", [] {
-            std::string message =
+            std::istringstream istream(
                 "The End;The\\; End;The\\\\ End;The\\\\\\\\ End;The\\\\\\; End;"
-            ;
-            MessageDeserializer deserializer(message);
+            );
+            PlaintextDeserializer deserializer_impl(istream);
+            Deserializer& deserializer = deserializer_impl;
 
             std::string fields[5];
 
@@ -179,8 +254,9 @@ static TestSuite deserializer_test_suite()
         })
 
         .test("deserialize past beyond end error", [] {
-            std::string message = "2;" ;
-            MessageDeserializer deserializer(message);
+            std::istringstream istream("2;");
+            PlaintextDeserializer deserializer_impl(istream);
+            Deserializer& deserializer = deserializer_impl;
 
             int64_t int_field;
             uint64_t actual = 0;
@@ -190,7 +266,7 @@ static TestSuite deserializer_test_suite()
             bool throwed = false;
             try {
                  deserializer >> actual;
-            } catch (InvalidMessagePayload const &exception) {
+            } catch (DeserializationError const &exception) {
                 throwed = true;
             }
 
@@ -200,6 +276,107 @@ static TestSuite deserializer_test_suite()
             );
             TEST_ASSERT(
                 std::string("should throw, but found ") + std::to_string(actual),
+                throwed
+            );
+        })
+
+        .test("deserialize bad signed int chars", [] {
+            std::istringstream istream("a;");
+            PlaintextDeserializer deserializer_impl(istream);
+            Deserializer& deserializer = deserializer_impl;
+
+            int64_t actual;
+
+            bool throwed = false;
+            try {
+                 deserializer >> actual;
+            } catch (DeserializationError const &exception) {
+                throwed = true;
+            }
+            TEST_ASSERT(
+                std::string("should throw, but found ")
+                    + std::to_string(actual),
+                throwed
+            );
+        })
+
+        .test("deserialize signed int out of range", [] {
+            std::istringstream istream("-1230;");
+            PlaintextDeserializer deserializer_impl(istream);
+            Deserializer& deserializer = deserializer_impl;
+
+            int8_t actual;
+
+            bool throwed = false;
+            try {
+                 deserializer >> actual;
+            } catch (DeserializationError const &exception) {
+                throwed = true;
+            }
+            TEST_ASSERT(
+                std::string("should throw, but found ")
+                    + std::to_string(actual),
+                throwed
+            );
+        })
+
+        .test("deserialize bad signal for unsigned int", [] {
+            std::istringstream istream("-1230;");
+            PlaintextDeserializer deserializer_impl(istream);
+            Deserializer& deserializer = deserializer_impl;
+
+            uint16_t actual;
+
+            bool throwed = false;
+            try {
+                 deserializer >> actual;
+            } catch (DeserializationError const &exception) {
+                throwed = true;
+            }
+            TEST_ASSERT(
+                std::string("should throw, but found ")
+                    + std::to_string(actual),
+                throwed
+            );
+        })
+
+
+        .test("deserialize unsigned int out of range", [] {
+            std::istringstream istream("1230;");
+            PlaintextDeserializer deserializer_impl(istream);
+            Deserializer& deserializer = deserializer_impl;
+
+            uint8_t actual;
+
+            bool throwed = false;
+            try {
+                 deserializer >> actual;
+            } catch (DeserializationError const &exception) {
+                throwed = true;
+            }
+            TEST_ASSERT(
+                std::string("should throw, but found ")
+                    + std::to_string(actual),
+                throwed
+            );
+        })
+
+        .test("deserialize empty int chars", [] {
+            std::istringstream istream(";");
+            PlaintextDeserializer deserializer_impl(istream);
+            Deserializer& deserializer = deserializer_impl;
+
+            int64_t actual;
+
+            bool throwed = false;
+            try {
+                 deserializer >> actual;
+            } catch (DeserializationError const &exception) {
+                throwed = true;
+            }
+            TEST_ASSERT(
+                std::string("should throw, but found ")
+                    + std::to_string(actual),
                 throwed
             );
         })

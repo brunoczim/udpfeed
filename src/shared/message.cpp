@@ -13,100 +13,6 @@ const char *InvalidMessagePayload::what() const noexcept
     return this->error_message.c_str();
 }
 
-std::string const& MessageSerializer::finish() const
-{
-    return this->bytes;
-}
-
-MessageSerializer& MessageSerializer::operator<<(char const *data)
-{
-    for (size_t i = 0; data[i] != 0; i++) {
-        switch (data[i]) {
-            case ';':
-            case '\\':
-                this->bytes.push_back('\\');
-            default:
-                this->bytes.push_back(data[i]);
-                break;
-        }
-    }
-    this->bytes.push_back(';');
-    return *this;
-}
-
-MessageSerializer& MessageSerializer::operator<<(std::string const& data)
-{
-    *this << data.c_str();
-    return *this;
-}
-
-MessageSerializer& MessageSerializer::operator<<(uint64_t data)
-{
-    std::stringstream sstream;
-    sstream << data;
-    *this << sstream.str();
-    return *this;
-}
-
-MessageSerializer& MessageSerializer::operator<<(int64_t data)
-{
-    std::stringstream sstream;
-    sstream << data;
-    *this << sstream.str();
-    return *this;
-}
-
-MessageDeserializer::MessageDeserializer(std::string const& bytes) :
-    bytes(bytes),
-    i(0)
-{
-}
-
-MessageDeserializer& MessageDeserializer::operator>>(std::string &data)
-{
-    data.erase();
-    uint8_t byte;
-    while ((byte = this->next()) != ';') {
-        if (byte == '\\') {
-            byte = this->next();
-        }
-        data.push_back(byte);
-    }
-    return *this;
-}
-
-MessageDeserializer& MessageDeserializer::operator>>(uint64_t& data)
-{
-    std::string buf;
-    *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
-    return *this;
-}
-
-MessageDeserializer& MessageDeserializer::operator>>(int64_t& data)
-{
-    std::string buf;
-    *this >> buf;
-    std::istringstream istream(buf);
-    istream >> data;
-    return *this;
-}
-
-uint8_t MessageDeserializer::next()
-{
-    if (this->i >= this->bytes.size()) {
-        throw InvalidMessagePayload("requested field that does not exist");
-    }
-    uint8_t byte = this->bytes[this->i];
-    this->i++;
-    return byte;
-}
-
-Serializable::~Serializable()
-{
-}
-
 InvalidMessageType::InvalidMessageType(uint16_t code) :
     message("invalid message type code: "),
     code_(code)
@@ -171,12 +77,12 @@ MessageHeader MessageHeader::create()
     return header;
 }
 
-void MessageHeader::serialize(MessageSerializer& serializer) const
+void MessageHeader::serialize(Serializer& serializer) const
 {
     serializer << this->seqn << this->timestamp;
 }
 
-void MessageHeader::deserialize(MessageDeserializer& deserializer)
+void MessageHeader::deserialize(Deserializer& deserializer)
 {
     deserializer >> this->seqn >> this->timestamp;
 }
@@ -198,12 +104,12 @@ MessageType MessageConnectReq::type()
     return MSG_CONNECT_REQ;
 }
 
-void MessageConnectReq::serialize(MessageSerializer& serializer) const
+void MessageConnectReq::serialize(Serializer& serializer) const
 {
     serializer << this->username;
 }
 
-void MessageConnectReq::deserialize(MessageDeserializer& deserializer)
+void MessageConnectReq::deserialize(Deserializer& deserializer)
 {
     deserializer >> this->username;
 }
@@ -221,12 +127,12 @@ MessageType MessageConnectResp::type()
     return MSG_CONNECT_RESP;
 }
 
-void MessageConnectResp::serialize(MessageSerializer& serializer) const
+void MessageConnectResp::serialize(Serializer& serializer) const
 {
     serializer << (uint64_t) this->status;
 }
 
-void MessageConnectResp::deserialize(MessageDeserializer& deserializer)
+void MessageConnectResp::deserialize(Deserializer& deserializer)
 {
     uint64_t code;
     deserializer >> code;
@@ -238,19 +144,19 @@ MessageType MessageReqAck::type()
     return MSG_REQ_ACK;
 }
 
-void MessageReqAck::serialize(MessageSerializer& serializer) const
+void MessageReqAck::serialize(Serializer& serializer) const
 {
 }
 
-void MessageReqAck::deserialize(MessageDeserializer& deserializer)
+void MessageReqAck::deserialize(Deserializer& deserializer)
 {
 }
 
-void MessageRespAck::serialize(MessageSerializer& serializer) const
+void MessageRespAck::serialize(Serializer& serializer) const
 {
 }
 
-void MessageRespAck::deserialize(MessageDeserializer& deserializer)
+void MessageRespAck::deserialize(Deserializer& deserializer)
 {
 }
 
@@ -259,15 +165,15 @@ MessageType MessageRespAck::type()
     return MSG_RESP_ACK;
 }
 
-void Message::serialize(MessageSerializer& serializer) const
+void Message::serialize(Serializer& serializer) const
 {
     uint64_t code = this->body->type();
     serializer << this->header << code << *this->body;
 }
 
-void Message::deserialize(MessageDeserializer& deserializer)
+void Message::deserialize(Deserializer& deserializer)
 {
-    uint64_t code;
+    uint16_t code;
     deserializer >> this->header >> code;
     MessageType type = msg_type_from_code(code);
     switch (type) {
@@ -285,22 +191,4 @@ void Message::deserialize(MessageDeserializer& deserializer)
             break;
     }
     deserializer >> *this->body;
-}
-
-MessageSerializer& operator<<(
-    MessageSerializer& serializer,
-    Serializable const& serializable
-)
-{
-    serializable.serialize(serializer);
-    return serializer;
-}
-
-MessageDeserializer& operator>>(
-    MessageDeserializer& deserializer,
-    Serializable& serializable
-)
-{
-    serializable.deserialize(deserializer);
-    return deserializer;
 }
