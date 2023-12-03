@@ -90,6 +90,7 @@ static TestSuite plaintext_ser_test_suite()
             Serializer& serializer = serializer_impl;
             serializer
                 << (uint8_t) 138
+                << false
                 << (uint16_t) 1243
                 << (uint32_t) 78679
                 << (uint64_t) 143
@@ -100,9 +101,11 @@ static TestSuite plaintext_ser_test_suite()
                 << std::vector<int32_t> { -1, 3 }
                 << (int64_t) -79;
             std::string actual = ostream.str();
+            char const *expected =
+                "138;0;1243;78679;143;-14;The End;-8430;-32;2;-1;3;-79;";
             TEST_ASSERT(
                 std::string("found ") + actual,
-                actual == "138;1243;78679;143;-14;The End;-8430;-32;2;-1;3;-79;"
+                actual == expected
             );
         })
 
@@ -134,11 +137,12 @@ static TestSuite plaintext_de_test_suite()
     return TestSuite()
         .test("deserialize fields of all types", [] {
             std::istringstream istream(
-                "138;1243;78679;143;-14;-8430;-32;The End;2;-1;3;-79;"
+                "1;138;1243;78679;143;-14;-8430;-32;The End;2;-1;3;-79;"
             );
             PlaintextDeserializer deserializer_impl(istream);
             Deserializer& deserializer = deserializer_impl;
 
+            bool bool_field;
             uint8_t u8_field;
             uint16_t u16_field;
             uint32_t u32_field;
@@ -151,6 +155,7 @@ static TestSuite plaintext_de_test_suite()
             int64_t i64_field;
 
             deserializer
+                >> bool_field
                 >> u8_field
                 >> u16_field
                 >> u32_field
@@ -161,6 +166,11 @@ static TestSuite plaintext_de_test_suite()
                 >> text_field
                 >> vec_field
                 >> i64_field;
+
+            TEST_ASSERT(
+                std::string("bool field, found ") + std::to_string(bool_field),
+                bool_field
+            );
 
             TEST_ASSERT(
                 std::string("uint8 field, found ") + std::to_string(u8_field),

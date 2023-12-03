@@ -41,6 +41,7 @@ class Serializer {
     public:
         Serializer(std::ostream& stream);
 
+        virtual Serializer& operator<<(bool data) = 0;
         virtual Serializer& operator<<(uint8_t data) = 0;
         virtual Serializer& operator<<(uint16_t data) = 0;
         virtual Serializer& operator<<(uint32_t data) = 0;
@@ -51,6 +52,7 @@ class Serializer {
         virtual Serializer& operator<<(int32_t data) = 0;
         virtual Serializer& operator<<(int64_t data) = 0;
 
+        virtual Serializer& operator<<(char const *data);
         virtual Serializer& operator<<(std::string const& data) = 0;
 
         template <typename T>
@@ -67,6 +69,7 @@ class Deserializer {
     public:
         Deserializer(std::istream& stream);
 
+        virtual Deserializer& operator>>(bool& data) = 0;
         virtual Deserializer& operator>>(uint8_t& data) = 0;
         virtual Deserializer& operator>>(uint16_t& data) = 0;
         virtual Deserializer& operator>>(uint32_t& data) = 0;
@@ -127,6 +130,7 @@ class PlaintextSerializer : public Serializer {
     public:
         PlaintextSerializer(std::ostream& stream);
 
+        virtual Serializer& operator<<(bool data);
         virtual Serializer& operator<<(uint8_t data);
         virtual Serializer& operator<<(uint16_t data);
         virtual Serializer& operator<<(uint32_t data);
@@ -158,6 +162,7 @@ class PlaintextDeserializer : public Deserializer {
     public:
         PlaintextDeserializer(std::istream& stream);
 
+        virtual Deserializer& operator>>(bool& data);
         virtual Deserializer& operator>>(uint8_t& data);
         virtual Deserializer& operator>>(uint16_t& data);
         virtual Deserializer& operator>>(uint32_t& data);

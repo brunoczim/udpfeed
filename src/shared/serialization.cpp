@@ -31,6 +31,12 @@ Serializer::Serializer(std::ostream& stream) : stream(stream)
 {
 }
 
+Serializer& Serializer::operator<<(char const *data)
+{
+    *this << std::string(data);
+    return *this;
+}
+
 Serializer& Serializer::operator<<(Serializable const& data)
 {
     data.serialize(*this);
@@ -73,6 +79,12 @@ Deserializable::~Deserializable()
 PlaintextSerializer::PlaintextSerializer(std::ostream& stream) :
     Serializer(stream)
 {
+}
+
+Serializer& PlaintextSerializer::operator<<(bool data)
+{
+    *this << (uint8_t) (data ? 1 : 0);
+    return *this;
 }
 
 Serializer& PlaintextSerializer::operator<<(uint8_t data)
@@ -164,6 +176,23 @@ char const *PlaintextInvalidInt::content() const
 PlaintextDeserializer::PlaintextDeserializer(std::istream& stream) :
     Deserializer(stream)
 {
+}
+
+Deserializer& PlaintextDeserializer::operator>>(bool& data)
+{
+    uint64_t integer;
+    *this >> integer;
+    switch (integer) {
+        case 0:
+            data = false;
+            break;
+        case 1:
+            data = true;
+            break;
+        default:
+            throw PlaintextInvalidInt("bool", "can only be 0 or 1");
+    }
+    return *this;
 }
 
 Deserializer& PlaintextDeserializer::operator>>(uint8_t& data)
