@@ -469,25 +469,23 @@ static TestSuite socket_test_suite()
             Message request_ack;
             request_ack.header = MessageHeader::create();
             request_ack.header.seqn = received_req.header.seqn;
-            request_ack.body =
-                std::shared_ptr<MessageReqAck>(new MessageReqAck);
+            request_ack.body = std::shared_ptr<MessageAck>(new MessageAck);
             server.send(request_ack, req_sender_addr);
 
             Address req_ack_sender_addr;
             Message received_req_ack = client.receive(req_ack_sender_addr);
 
             TEST_ASSERT(
-                "message type should be MSG_REQ_ACK, found: "
+                "message type should be MSG_ACK, found: "
                     + std::to_string(received_req_ack.body->type()),
-                received_req_ack.body->type() == MSG_REQ_ACK
+                received_req_ack.body->type() == MSG_ACK
             );
 
-            MessageReqAck const& casted_req_ack_body_ =
-                dynamic_cast<MessageReqAck const&>(*received_req_ack.body);
+            MessageAck const& casted_req_ack_body_ =
+                dynamic_cast<MessageAck const&>(*received_req_ack.body);
 
             Message response;
             response.header = MessageHeader::create();
-            response.header.seqn = received_req.header.seqn;
             response.body = std::shared_ptr<MessageConnectResp>(
                 new MessageConnectResp(MSG_OK)
             );
@@ -514,21 +512,20 @@ static TestSuite socket_test_suite()
             Message response_ack;
             response_ack.header = MessageHeader::create();
             response_ack.header.seqn = received_resp.header.seqn;
-            response_ack.body =
-                std::shared_ptr<MessageRespAck>(new MessageRespAck);
+            response_ack.body = std::shared_ptr<MessageAck>(new MessageAck);
             client.send(response_ack, resp_sender_addr);
 
             Address resp_ack_sender_addr;
             Message received_resp_ack = server.receive(resp_ack_sender_addr);
 
             TEST_ASSERT(
-                "message type should be MSG_RESP_ACK, found: "
+                "message type should be MSG_ACK, found: "
                     + std::to_string(received_resp_ack.body->type()),
-                received_resp_ack.body->type() == MSG_RESP_ACK
+                received_resp_ack.body->type() == MSG_ACK
             );
 
-            MessageRespAck const& casted_resp_ack_body_ =
-                dynamic_cast<MessageRespAck const&>(*received_resp_ack.body);
+            MessageAck const& casted_resp_ack_body_ =
+                dynamic_cast<MessageAck const&>(*received_resp_ack.body);
         })
     ;
 }

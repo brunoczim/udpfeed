@@ -33,12 +33,26 @@ const char *InvalidMessageType::what() const noexcept
 MessageType msg_type_from_code(uint16_t code)
 {
     switch (code) {
+        case MSG_ACK: return MSG_ACK;
         case MSG_CONNECT_REQ: return MSG_CONNECT_REQ;
         case MSG_CONNECT_RESP: return MSG_CONNECT_RESP;
-        case MSG_REQ_ACK: return MSG_REQ_ACK;
-        case MSG_RESP_ACK: return MSG_RESP_ACK;
         default: throw InvalidMessageType(code);
     }
+}
+
+Serializer& operator<<(Serializer& serializer, MessageType type)
+{
+    uint16_t code = type;
+    serializer << code;
+    return serializer;
+}
+
+Deserializer& operator>>(Deserializer& deserializer, MessageType &type)
+{
+    uint16_t code;
+    deserializer >> code;
+    type = msg_type_from_code(code);
+    return deserializer;
 }
 
 InvalidMessageStatus::InvalidMessageStatus(uint16_t code) :
@@ -68,6 +82,21 @@ MessageStatus msg_status_from_code(uint16_t code)
     }
 }
 
+Serializer& operator<<(Serializer& serializer, MessageStatus status)
+{
+    uint16_t code = status;
+    serializer << code;
+    return serializer;
+}
+
+Deserializer& operator>>(Deserializer& deserializer, MessageStatus& status)
+{
+    uint16_t code;
+    deserializer >> code;
+    status = msg_status_from_code(code);
+    return deserializer;
+}
+
 MessageHeader MessageHeader::create()
 {
     static std::atomic<uint64_t> current_seqn = 0;
@@ -88,6 +117,19 @@ void MessageHeader::deserialize(Deserializer& deserializer)
 }
 
 MessageBody::~MessageBody()
+{
+}
+
+MessageType MessageAck::type()
+{
+    return MSG_ACK;
+}
+
+void MessageAck::serialize(Serializer& serializer) const
+{
+}
+
+void MessageAck::deserialize(Deserializer& deserializer)
 {
 }
 
@@ -139,32 +181,6 @@ void MessageConnectResp::deserialize(Deserializer& deserializer)
     this->status = msg_status_from_code(code);
 }
 
-MessageType MessageReqAck::type()
-{
-    return MSG_REQ_ACK;
-}
-
-void MessageReqAck::serialize(Serializer& serializer) const
-{
-}
-
-void MessageReqAck::deserialize(Deserializer& deserializer)
-{
-}
-
-void MessageRespAck::serialize(Serializer& serializer) const
-{
-}
-
-void MessageRespAck::deserialize(Deserializer& deserializer)
-{
-}
-
-MessageType MessageRespAck::type()
-{
-    return MSG_RESP_ACK;
-}
-
 void Message::serialize(Serializer& serializer) const
 {
     uint64_t code = this->body->type();
@@ -173,21 +189,23 @@ void Message::serialize(Serializer& serializer) const
 
 void Message::deserialize(Deserializer& deserializer)
 {
+    deserializer >> this->header;
     uint16_t code;
-    deserializer >> this->header >> code;
+    deserializer >> code;
     MessageType type = msg_type_from_code(code);
     switch (type) {
+        case MSG_ACK:
+            this->body =
+                std::shared_ptr<MessageBody>(new MessageAck);
+            break;
         case MSG_CONNECT_REQ:
-            this->body = std::shared_ptr<MessageBody>(new MessageConnectReq);
+            this->body =
+                std::shared_ptr<MessageBody>(new MessageConnectReq);
             break;
         case MSG_CONNECT_RESP:
-            this->body = std::shared_ptr<MessageBody>(new MessageConnectResp);
+            this->body =
+                std::shared_ptr<MessageBody>(new MessageConnectResp);
             break;
-        case MSG_REQ_ACK:
-            this->body = std::shared_ptr<MessageBody>(new MessageReqAck);
-            break;
-        case MSG_RESP_ACK:
-            this->body = std::shared_ptr<MessageBody>(new MessageRespAck);
             break;
     }
     deserializer >> *this->body;

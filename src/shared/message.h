@@ -17,8 +17,7 @@ class InvalidMessagePayload: public std::exception {
 };
 
 enum MessageType {
-    MSG_REQ_ACK,
-    MSG_RESP_ACK,
+    MSG_ACK,
     MSG_CONNECT_REQ,
     MSG_CONNECT_RESP
 };
@@ -36,6 +35,9 @@ class InvalidMessageType : public std::exception {
 };
 
 MessageType msg_type_from_code(uint16_t code);
+
+Serializer& operator<<(Serializer& serializer, MessageType type);
+Deserializer& operator>>(Deserializer& deserializer, MessageType &type);
 
 enum MessageStatus {
     MSG_OK,
@@ -57,10 +59,14 @@ class InvalidMessageStatus : public std::exception {
 
 MessageStatus msg_status_from_code(uint16_t code);
 
+Serializer& operator<<(Serializer& serializer, MessageStatus status);
+Deserializer& operator>>(Deserializer& deserializer, MessageStatus& status);
+
 class MessageHeader : public Serializable, public Deserializable {
     public:
         uint64_t seqn;
         uint64_t timestamp;
+        bool ack;
 
         static MessageHeader create();
 
@@ -73,6 +79,15 @@ class MessageBody : public Serializable, public Deserializable {
     public:
         virtual MessageType type() = 0;
         virtual ~MessageBody();
+};
+
+class MessageAck : public MessageBody {
+    public:
+        virtual MessageType type();
+
+        virtual void serialize(Serializer& serializer) const;
+
+        virtual void deserialize(Deserializer& deserializer);
 };
 
 class MessageConnectReq : public MessageBody {
@@ -96,24 +111,6 @@ class MessageConnectResp : public MessageBody {
         MessageConnectResp();
         MessageConnectResp(MessageStatus status);
 
-        virtual MessageType type();
-
-        virtual void serialize(Serializer& serializer) const;
-
-        virtual void deserialize(Deserializer& deserializer);
-};
-
-class MessageReqAck : public MessageBody {
-    public:
-        virtual MessageType type();
-
-        virtual void serialize(Serializer& serializer) const;
-
-        virtual void deserialize(Deserializer& deserializer);
-};
-
-class MessageRespAck : public MessageBody {
-    public:
         virtual MessageType type();
 
         virtual void serialize(Serializer& serializer) const;
