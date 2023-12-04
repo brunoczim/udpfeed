@@ -19,7 +19,9 @@ class InvalidMessagePayload: public std::exception {
 enum MessageType {
     MSG_ACK,
     MSG_CONNECT_REQ,
-    MSG_CONNECT_RESP
+    MSG_CONNECT_RESP,
+    MSG_DISCONNECT,
+    MSG_PING
 };
 
 class InvalidMessageType : public std::exception {
@@ -111,6 +113,24 @@ class MessageConnectResp : public MessageBody {
         MessageConnectResp();
         MessageConnectResp(MessageStatus status);
 
+        virtual MessageType type();
+
+        virtual void serialize(Serializer& serializer) const;
+
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageDisconnect : public MessageBody {
+    public:
+        virtual MessageType type();
+
+        virtual void serialize(Serializer& serializer) const;
+
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessagePing : public MessageBody {
+    public:
         virtual MessageType type();
 
         virtual void serialize(Serializer& serializer) const;

@@ -36,6 +36,8 @@ MessageType msg_type_from_code(uint16_t code)
         case MSG_ACK: return MSG_ACK;
         case MSG_CONNECT_REQ: return MSG_CONNECT_REQ;
         case MSG_CONNECT_RESP: return MSG_CONNECT_RESP;
+        case MSG_DISCONNECT: return MSG_DISCONNECT;
+        case MSG_PING: return MSG_PING;
         default: throw InvalidMessageType(code);
     }
 }
@@ -179,6 +181,32 @@ void MessageConnectResp::deserialize(Deserializer& deserializer)
     uint64_t code;
     deserializer >> code;
     this->status = msg_status_from_code(code);
+}
+
+MessageType MessageDisconnect::type()
+{
+    return MSG_DISCONNECT;
+}
+
+void MessageDisconnect::serialize(Serializer& serializer) const
+{
+}
+
+void MessageDisconnect::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageType MessagePing::type()
+{
+    return MSG_PING;
+}
+
+void MessagePing::serialize(Serializer& serializer) const
+{
+}
+
+void MessagePing::deserialize(Deserializer& deserializer)
+{
 }
 
 void Message::serialize(Serializer& serializer) const
