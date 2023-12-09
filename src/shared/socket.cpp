@@ -71,6 +71,21 @@ Socket::Socket(Socket&& other) : sockfd(other.sockfd)
     other.sockfd = -1;
 }
 
+Socket& Socket::operator=(Socket&& obj)
+{
+    if (this->sockfd != obj.sockfd) {
+        this->close();
+    }
+    this->sockfd = obj.sockfd;
+    obj.sockfd = -1;
+    return *this;
+}
+
+Socket::~Socket()
+{
+    this->close();
+}
+
 Message Socket::receive(Address &sender_addr_out)
 {
     struct sockaddr_in sender_addr;
@@ -150,10 +165,10 @@ void Socket::send(Message const& message, Address const& receiver_addr)
     }
 }
 
-Socket::~Socket()
+void Socket::close()
 {
     if (this->sockfd >= 0) {
         shutdown(this->sockfd, SHUT_RDWR);
-        close(this->sockfd);
+        ::close(this->sockfd);
     }
 }

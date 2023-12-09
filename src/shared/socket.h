@@ -41,8 +41,11 @@ class Socket {
         Socket(size_t max_message_size);
         Socket(size_t max_message_size, uint16_t port);
         Socket(Socket&& other);
-        Socket(const Socket& obj) = delete;
-        Socket& operator=(const Socket& obj) = delete;
+        Socket(Socket const& obj) = delete;
+        Socket& operator=(Socket const& obj) = delete;
+        Socket& operator=(Socket&& obj);
+
+        ~Socket();
 
         Message receive(Address &sender_addr_out);
         std::optional<Message> receive(
@@ -51,42 +54,9 @@ class Socket {
         );
 
         void send(Message const& message, Address const& receiver_addr);
-
-        ~Socket();
-};
-
-class ReliableSocket {
+    
     private:
-        class PendingAck {
-            public:
-                Message message;
-                uint16_t remaining_attempts;
-                std::function<void (bool, Message)> send_handler;
-        };
-
-        class Connection {
-            public:
-                Address other_addr;
-                uint64_t min_seqn_bound;
-                std::map<uint64_t, PendingAck> pending_acks;
-        };
-
-        Socket udp;
-        std::map<Address, Connection> connections;
-        std::function<void (Message)> recv_handler;
-
-    public:
-        template <typename F>
-        ReliableSocket(Socket&& udp, F&& recv_handler);
-
-        void poll_recv();
-
-        template <typename F>
-        void send(
-            Message const& message,
-            Address const& receiver_addr,
-            F&& handler
-        );
+        void close();
 };
 
 #endif
