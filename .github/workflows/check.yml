@@ -1,4 +1,4 @@
-name: Andiskaz CI - Check
+name: UDP-feed CI - Check
 on: [push, pull_request]
 
 jobs:

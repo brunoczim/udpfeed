@@ -16,31 +16,6 @@ class InvalidMessagePayload: public std::exception {
         virtual const char *what() const noexcept;
 };
 
-enum MessageType {
-    MSG_ACK,
-    MSG_CONNECT_REQ,
-    MSG_CONNECT_RESP,
-    MSG_DISCONNECT,
-    MSG_PING
-};
-
-class InvalidMessageType : public std::exception {
-    private:
-        std::string message;
-        uint16_t code_;
-    public:
-        InvalidMessageType(uint16_t code);
-
-        uint16_t code() const;
-
-        virtual const char *what() const noexcept;
-};
-
-MessageType msg_type_from_code(uint16_t code);
-
-Serializer& operator<<(Serializer& serializer, MessageType type);
-Deserializer& operator>>(Deserializer& deserializer, MessageType &type);
-
 enum MessageStatus {
     MSG_OK,
     MSG_BAD_USERNAME,
@@ -64,32 +39,88 @@ MessageStatus msg_status_from_code(uint16_t code);
 Serializer& operator<<(Serializer& serializer, MessageStatus status);
 Deserializer& operator>>(Deserializer& deserializer, MessageStatus& status);
 
+enum MessageStep {
+    MSG_REQ,
+    MSG_RESP
+};
+
+class InvalidMessageStep : public std::exception {
+    private:
+        std::string message;
+        uint16_t code_;
+    public:
+        InvalidMessageStep(uint16_t code);
+
+        uint16_t code() const;
+
+        virtual const char *what() const noexcept;
+};
+
+MessageStep msg_step_from_code(uint16_t code);
+
+Serializer& operator<<(Serializer& serializer, MessageStep step);
+Deserializer& operator>>(Deserializer& deserializer, MessageStep &step);
+
+enum MessageType {
+    MSG_CONNECT,
+    MSG_DISCONNECT
+};
+
+class InvalidMessageType : public std::exception {
+    private:
+        std::string message;
+        uint16_t code_;
+    public:
+        InvalidMessageType(uint16_t code);
+
+        uint16_t code() const;
+
+        virtual const char *what() const noexcept;
+};
+
+MessageType msg_tag_from_code(uint16_t code);
+
+Serializer& operator<<(Serializer& serializer, MessageType tag);
+Deserializer& operator>>(Deserializer& deserializer, MessageType &tag);
+
+class MessageTag : public Serializable, public Deserializable {
+    public:
+        MessageStep step;
+        MessageType type;
+
+        MessageTag();
+        MessageTag(MessageStep step, MessageType type);
+
+        bool operator==(MessageTag const& other) const;
+        bool operator!=(MessageTag const& other) const;
+
+        bool operator<(MessageTag const& other) const;
+        bool operator<=(MessageTag const& other) const;
+        bool operator>(MessageTag const& other) const;
+        bool operator>=(MessageTag const& other) const;
+
+        std::string to_string() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
 class MessageHeader : public Serializable, public Deserializable {
     public:
         uint64_t seqn;
         uint64_t timestamp;
-        bool ack;
 
-        static MessageHeader create();
+        static MessageHeader gen_request();
+        static MessageHeader gen_response(uint64_t seqn);
 
         virtual void serialize(Serializer& serializer) const;
-
         virtual void deserialize(Deserializer& deserializer);
 };
 
 class MessageBody : public Serializable, public Deserializable {
     public:
-        virtual MessageType type() = 0;
+        virtual MessageTag tag() const = 0;
         virtual ~MessageBody();
-};
-
-class MessageAck : public MessageBody {
-    public:
-        virtual MessageType type();
-
-        virtual void serialize(Serializer& serializer) const;
-
-        virtual void deserialize(Deserializer& deserializer);
 };
 
 class MessageConnectReq : public MessageBody {
@@ -99,10 +130,9 @@ class MessageConnectReq : public MessageBody {
         MessageConnectReq();
         MessageConnectReq(std::string username);
 
-        virtual MessageType type();
+        virtual MessageTag tag() const;
 
         virtual void serialize(Serializer& serializer) const;
-
         virtual void deserialize(Deserializer& deserializer);
 };
 
@@ -113,28 +143,25 @@ class MessageConnectResp : public MessageBody {
         MessageConnectResp();
         MessageConnectResp(MessageStatus status);
 
-        virtual MessageType type();
+        virtual MessageTag tag() const;
 
         virtual void serialize(Serializer& serializer) const;
-
         virtual void deserialize(Deserializer& deserializer);
 };
 
-class MessageDisconnect : public MessageBody {
+class MessageDisconnectReq : public MessageBody {
     public:
-        virtual MessageType type();
+        virtual MessageTag tag() const;
 
         virtual void serialize(Serializer& serializer) const;
-
         virtual void deserialize(Deserializer& deserializer);
 };
 
-class MessagePing : public MessageBody {
+class MessageDisconnectResp : public MessageBody {
     public:
-        virtual MessageType type();
+        virtual MessageTag tag() const;
 
         virtual void serialize(Serializer& serializer) const;
-
         virtual void deserialize(Deserializer& deserializer);
 };
 
@@ -144,7 +171,6 @@ class Message : public Serializable, public Deserializable {
         std::shared_ptr<MessageBody> body;
 
         virtual void serialize(Serializer& serializer) const;
-
         virtual void deserialize(Deserializer& deserializer);
 };
 

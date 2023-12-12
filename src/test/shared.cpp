@@ -405,7 +405,7 @@ static TestSuite socket_test_suite()
             Socket client(500);
             Socket server(500, 8082);
             Message message;
-            message.header = MessageHeader::create();
+            message.header = MessageHeader::gen_request();
             message.body = std::shared_ptr<MessageConnectReq>(
                 new MessageConnectReq("bruno")
             );
@@ -427,9 +427,8 @@ static TestSuite socket_test_suite()
             );
 
             TEST_ASSERT(
-                "message type should be MSG_CONNECT_REQ, found: "
-                    + std::to_string(received.body->type()),
-                received.body->type() == MSG_CONNECT_REQ
+                "found message tag: " + received.body->tag().to_string(),
+                received.body->tag() == MessageTag(MSG_REQ, MSG_CONNECT)
             );
 
             MessageConnectReq const& casted_body =
@@ -447,7 +446,7 @@ static TestSuite socket_test_suite()
             Socket server(500, 8082);
 
             Message request;
-            request.header = MessageHeader::create();
+            request.header = MessageHeader::gen_request();
             request.body = std::shared_ptr<MessageConnectReq>(
                 new MessageConnectReq("bruno")
             );
@@ -457,9 +456,8 @@ static TestSuite socket_test_suite()
             Message received_req = server.receive(req_sender_addr);
 
             TEST_ASSERT(
-                "message type should be MSG_CONNECT_REQ, found: "
-                    + std::to_string(received_req.body->type()),
-                received_req.body->type() == MSG_CONNECT_REQ
+                "found " + received_req.body->tag().to_string(),
+                received_req.body->tag() == MessageTag(MSG_REQ, MSG_CONNECT)
             );
 
             MessageConnectReq const& casted_req_body =
@@ -471,26 +469,9 @@ static TestSuite socket_test_suite()
                 casted_req_body.username == "bruno"
             );
 
-            Message request_ack;
-            request_ack.header = MessageHeader::create();
-            request_ack.header.seqn = received_req.header.seqn;
-            request_ack.body = std::shared_ptr<MessageAck>(new MessageAck);
-            server.send(request_ack, req_sender_addr);
-
-            Address req_ack_sender_addr;
-            Message received_req_ack = client.receive(req_ack_sender_addr);
-
-            TEST_ASSERT(
-                "message type should be MSG_ACK, found: "
-                    + std::to_string(received_req_ack.body->type()),
-                received_req_ack.body->type() == MSG_ACK
-            );
-
-            MessageAck const& casted_req_ack_body_ =
-                dynamic_cast<MessageAck const&>(*received_req_ack.body);
-
             Message response;
-            response.header = MessageHeader::create();
+            response.header =
+                MessageHeader::gen_response(received_req.header.seqn);
             response.body = std::shared_ptr<MessageConnectResp>(
                 new MessageConnectResp(MSG_OK)
             );
@@ -500,9 +481,8 @@ static TestSuite socket_test_suite()
             Message received_resp = client.receive(resp_sender_addr);
 
             TEST_ASSERT(
-                "message type should be MSG_CONNECT_RESP, found: "
-                    + std::to_string(received_resp.body->type()),
-                received_resp.body->type() == MSG_CONNECT_RESP
+                "found " + received_resp.body->tag().to_string(),
+                received_resp.body->tag() == MessageTag(MSG_RESP, MSG_CONNECT)
             );
 
             MessageConnectResp const& casted_resp_body =
@@ -513,24 +493,6 @@ static TestSuite socket_test_suite()
                     + casted_resp_body.status,
                 casted_resp_body.status == MSG_OK
             );
-
-            Message response_ack;
-            response_ack.header = MessageHeader::create();
-            response_ack.header.seqn = received_resp.header.seqn;
-            response_ack.body = std::shared_ptr<MessageAck>(new MessageAck);
-            client.send(response_ack, resp_sender_addr);
-
-            Address resp_ack_sender_addr;
-            Message received_resp_ack = server.receive(resp_ack_sender_addr);
-
-            TEST_ASSERT(
-                "message type should be MSG_ACK, found: "
-                    + std::to_string(received_resp_ack.body->type()),
-                received_resp_ack.body->type() == MSG_ACK
-            );
-
-            MessageAck const& casted_resp_ack_body_ =
-                dynamic_cast<MessageAck const&>(*received_resp_ack.body);
         })
 ;
 }
