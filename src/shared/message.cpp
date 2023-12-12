@@ -13,6 +13,47 @@ const char *InvalidMessagePayload::what() const noexcept
     return this->error_message.c_str();
 }
 
+InvalidMessageStep::InvalidMessageStep(uint16_t code) :
+    message("invalid message step code: "),
+    code_(code)
+{
+    this->message += std::to_string(code);
+}
+
+uint16_t InvalidMessageStep::code() const
+{
+    return this->code_;
+}
+
+const char *InvalidMessageStep::what() const noexcept
+{
+    return this->message.c_str();
+}
+
+MessageStep msg_step_from_code(uint16_t code)
+{
+    switch (code) {
+        case MSG_REQ: return MSG_REQ;
+        case MSG_RESP: return MSG_RESP;
+        default: throw InvalidMessageStep(code);
+    }
+}
+
+Serializer& operator<<(Serializer& serializer, MessageStep step)
+{
+    uint16_t code = step;
+    serializer << code;
+    return serializer;
+}
+
+Deserializer& operator>>(Deserializer& deserializer, MessageStep &step)
+{
+    uint16_t code;
+    deserializer >> code;
+    step = msg_step_from_code(code);
+    return deserializer;
+}
+
 InvalidMessageType::InvalidMessageType(uint16_t code) :
     message("invalid message type code: "),
     code_(code)
@@ -33,11 +74,8 @@ const char *InvalidMessageType::what() const noexcept
 MessageType msg_type_from_code(uint16_t code)
 {
     switch (code) {
-        case MSG_ACK: return MSG_ACK;
-        case MSG_CONNECT_REQ: return MSG_CONNECT_REQ;
-        case MSG_CONNECT_RESP: return MSG_CONNECT_RESP;
+        case MSG_CONNECT: return MSG_CONNECT;
         case MSG_DISCONNECT: return MSG_DISCONNECT;
-        case MSG_PING: return MSG_PING;
         default: throw InvalidMessageType(code);
     }
 }
@@ -99,11 +137,85 @@ Deserializer& operator>>(Deserializer& deserializer, MessageStatus& status)
     return deserializer;
 }
 
-MessageHeader MessageHeader::create()
+MessageTag::MessageTag() : MessageTag(MSG_REQ, MSG_CONNECT)
+{
+}
+
+MessageTag::MessageTag(MessageStep step, MessageType type) :
+    step(step),
+    type(type)
+{
+}
+
+bool MessageTag::operator==(MessageTag const& other) const
+{
+    return this->step == other.step && this->type == other.type;
+}
+
+bool MessageTag::operator!=(MessageTag const& other) const
+{
+    return this->step != other.step || this->type != other.type;
+}
+
+bool MessageTag::operator<(MessageTag const& other) const
+{
+    if (this->step < other.step) {
+        return true;
+    }
+    return this->step == other.step && this->type < other.type;
+}
+
+bool MessageTag::operator<=(MessageTag const& other) const
+{
+    return this->step <= other.step && this->type <= other.type;
+}
+
+bool MessageTag::operator>(MessageTag const& other) const
+{
+    if (this->step > other.step) {
+        return true;
+    }
+    return this->step == other.step && this->type > other.type;
+}
+
+bool MessageTag::operator>=(MessageTag const& other) const
+{
+    return this->step >= other.step && this->type >= other.type;
+}
+
+void MessageTag::serialize(Serializer& serializer) const
+{
+    serializer << this->step << this->type;
+}
+
+void MessageTag::deserialize(Deserializer& deserializer)
+{
+    deserializer >> this->step >> this->type;
+}
+
+std::string MessageTag::to_string() const
+{
+    return std::string("MessageTag { .step = ")
+        + std::to_string(this->step)
+        + ", .type = "
+        + std::to_string(this->type)
+        + "}"
+    ;
+}
+
+MessageHeader MessageHeader::gen_request()
 {
     static std::atomic<uint64_t> current_seqn = 0;
     MessageHeader header;
     header.seqn = current_seqn.fetch_add(1);
+    header.timestamp = time(NULL);
+    return header;
+}
+
+MessageHeader MessageHeader::gen_response(uint64_t seqn)
+{
+    MessageHeader header;
+    header.seqn = seqn;
     header.timestamp = time(NULL);
     return header;
 }
@@ -122,19 +234,6 @@ MessageBody::~MessageBody()
 {
 }
 
-MessageType MessageAck::type()
-{
-    return MSG_ACK;
-}
-
-void MessageAck::serialize(Serializer& serializer) const
-{
-}
-
-void MessageAck::deserialize(Deserializer& deserializer)
-{
-}
-
 MessageConnectReq::MessageConnectReq() : MessageConnectReq(std::string())
 {
 }
@@ -143,9 +242,9 @@ MessageConnectReq::MessageConnectReq(std::string username) : username(username)
 {
 }
 
-MessageType MessageConnectReq::type()
+MessageTag MessageConnectReq::tag() const
 {
-    return MSG_CONNECT_REQ;
+    return MessageTag(MSG_REQ, MSG_CONNECT);
 }
 
 void MessageConnectReq::serialize(Serializer& serializer) const
@@ -166,9 +265,9 @@ MessageConnectResp::MessageConnectResp(MessageStatus status) : status(status)
 {
 }
 
-MessageType MessageConnectResp::type()
+MessageTag MessageConnectResp::tag() const
 {
-    return MSG_CONNECT_RESP;
+    return MessageTag(MSG_RESP, MSG_CONNECT);
 }
 
 void MessageConnectResp::serialize(Serializer& serializer) const
@@ -183,58 +282,75 @@ void MessageConnectResp::deserialize(Deserializer& deserializer)
     this->status = msg_status_from_code(code);
 }
 
-MessageType MessageDisconnect::type()
+MessageTag MessageDisconnectReq::tag() const
 {
-    return MSG_DISCONNECT;
+    return MessageTag(MSG_REQ, MSG_DISCONNECT);
 }
 
-void MessageDisconnect::serialize(Serializer& serializer) const
-{
-}
-
-void MessageDisconnect::deserialize(Deserializer& deserializer)
+void MessageDisconnectReq::serialize(Serializer& serializer) const
 {
 }
 
-MessageType MessagePing::type()
-{
-    return MSG_PING;
-}
-
-void MessagePing::serialize(Serializer& serializer) const
+void MessageDisconnectReq::deserialize(Deserializer& deserializer)
 {
 }
 
-void MessagePing::deserialize(Deserializer& deserializer)
+MessageTag MessageDisconnectResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_DISCONNECT);
+}
+
+void MessageDisconnectResp::serialize(Serializer& serializer) const
+{
+}
+
+void MessageDisconnectResp::deserialize(Deserializer& deserializer)
 {
 }
 
 void Message::serialize(Serializer& serializer) const
 {
-    uint64_t code = this->body->type();
-    serializer << this->header << code << *this->body;
+    serializer
+        << this->header
+        << this->body->tag()
+        << *this->body;
 }
 
 void Message::deserialize(Deserializer& deserializer)
 {
-    deserializer >> this->header;
-    uint16_t code;
-    deserializer >> code;
-    MessageType type = msg_type_from_code(code);
-    switch (type) {
-        case MSG_ACK:
-            this->body =
-                std::shared_ptr<MessageBody>(new MessageAck);
+    MessageTag tag;
+    deserializer >> this->header >> tag;
+    this->body.reset();
+    switch (tag.step) {
+        case MSG_REQ:
+            switch (tag.type) {
+                case MSG_CONNECT:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageConnectReq);
+                    break;
+                case MSG_DISCONNECT:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageDisconnectReq);
+                    break;
+            }
             break;
-        case MSG_CONNECT_REQ:
-            this->body =
-                std::shared_ptr<MessageBody>(new MessageConnectReq);
+        case MSG_RESP:
+            switch (tag.type) {
+                case MSG_CONNECT:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageConnectResp);
+                    break;
+                case MSG_DISCONNECT:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageDisconnectResp);
+                    break;
+            }
             break;
-        case MSG_CONNECT_RESP:
-            this->body =
-                std::shared_ptr<MessageBody>(new MessageConnectResp);
-            break;
-            break;
+    }
+    if (!this->body) {
+        throw InvalidMessagePayload(
+            std::string("invalid message tag:  ") + tag.to_string()
+        );
     }
     deserializer >> *this->body;
 }

@@ -72,7 +72,7 @@ Address::Address(std::array<uint8_t, 4> ipv4, uint16_t port) :
 {
 }
 
-bool Address::operator=(Address const& other) const
+bool Address::operator==(Address const& other) const
 {
     return this->ipv4 == other.ipv4 && this->port == other.port;
 }

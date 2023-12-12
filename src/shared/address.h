@@ -24,23 +24,24 @@ uint16_t parse_udp_port(std::string const& content);
 
 uint32_t make_ipv4(std::array<uint8_t, 4> bytes);
 
-struct Address {
-    uint32_t ipv4;
-    uint16_t port;
+class Address {
+    public:
+        uint32_t ipv4;
+        uint16_t port;
 
-    Address();
-    Address(uint32_t ipv4, uint16_t port);
-    Address(std::array<uint8_t, 4> ipv4, uint16_t port);
+        Address();
+        Address(uint32_t ipv4, uint16_t port);
+        Address(std::array<uint8_t, 4> ipv4, uint16_t port);
 
-    bool operator=(Address const& other) const;
-    bool operator!=(Address const& other) const;
+        bool operator==(Address const& other) const;
+        bool operator!=(Address const& other) const;
 
-    bool operator<(Address const& other) const;
-    bool operator<=(Address const& other) const;
-    bool operator>(Address const& other) const;
-    bool operator>=(Address const& other) const;
+        bool operator<(Address const& other) const;
+        bool operator<=(Address const& other) const;
+        bool operator>(Address const& other) const;
+        bool operator>=(Address const& other) const;
 
-    std::string to_string() const;
+        std::string to_string() const;
 };
 
 #endif
