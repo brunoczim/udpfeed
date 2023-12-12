@@ -1,12 +1,16 @@
+#include <set>
+#include <thread>
 #include "shared.h"
 #include "../shared/address.h"
 #include "../shared/message.h"
 #include "../shared/socket.h"
+#include "../shared/channel.h"
 
 static TestSuite parse_udp_port_test_suite();
 static TestSuite plaintext_ser_test_suite();
 static TestSuite plaintext_de_test_suite();
 static TestSuite socket_test_suite();
+static TestSuite channel_test_suite();
 
 TestSuite shared_test_suite()
 {
@@ -15,6 +19,7 @@ TestSuite shared_test_suite()
         .append(plaintext_ser_test_suite())
         .append(plaintext_de_test_suite())
         .append(socket_test_suite())
+        .append(channel_test_suite())
     ;
 }
 
@@ -527,5 +532,148 @@ static TestSuite socket_test_suite()
             MessageAck const& casted_resp_ack_body_ =
                 dynamic_cast<MessageAck const&>(*received_resp_ack.body);
         })
-    ;
+;
+}
+
+static TestSuite channel_test_suite()
+{
+    return TestSuite()
+        .test("single producer, single consumer, sender ends first", [] {
+            Channel<uint64_t> channel;
+            Channel<uint64_t>::Sender sender = std::move(channel.sender);
+            Channel<uint64_t>::Receiver receiver = std::move(channel.receiver);
+            constexpr uint64_t total_messages = 12345;
+            std::thread sender_thread ([sender = std::move(sender)] () mutable {
+                for (uint64_t i = 0; i < total_messages; i++) {
+                    sender.send(i);
+                }
+            });
+
+            bool disconnected = false;
+
+            uint64_t message_count = 0;
+
+            while (!disconnected) {
+                try {
+                    uint64_t message = receiver.receive();
+                    TEST_ASSERT(
+                        std::string("message should be ")
+                            + std::to_string(message_count)
+                            + ", found "
+                            + std::to_string(message),
+                        message == message_count
+                    );
+                    message_count++;
+                } catch (SendersDisconnected const& exc) {
+                    disconnected = true;
+                }
+            }
+
+            sender_thread.join();
+
+            TEST_ASSERT(
+                std::string("found actual message count to be ")
+                    + std::to_string(message_count),
+                message_count == total_messages
+            );
+        })
+
+        .test("single producer, single consumer, receiver ends first", [] {
+            Channel<uint64_t> channel;
+            Channel<uint64_t>::Sender sender = std::move(channel.sender);
+            {
+                Channel<uint64_t>::Receiver receiver =
+                    std::move(channel.receiver);
+            }
+
+            bool disconnected = false;
+            try {
+                sender.send(3);
+            } catch (ReceiversDisconnected const& exception) {
+                disconnected = true;
+            }
+
+            TEST_ASSERT(
+                std::string("should have disconnected, did it? ")
+                    + (disconnected ? "true" : "false"),
+                disconnected
+            );
+        })
+
+        .test("multi producer, multi consumer", [] {
+            std::set<uint64_t> received_messages;
+            std::mutex message_mutex;
+            Channel<uint64_t> channel;
+            Channel<uint64_t>::Sender sender = std::move(channel.sender);
+            Channel<uint64_t>::Receiver receiver = std::move(channel.receiver);
+            constexpr uint64_t total_receivers = 4;
+            constexpr uint64_t total_senders = 4;
+            constexpr uint64_t total_messages = 48000;
+            constexpr uint64_t messages_per_sender =
+                total_messages / total_senders;
+
+            std::vector<std::thread> sender_threads;
+
+            for (uint64_t i = 0; i < total_senders; i++) {
+                sender_threads.push_back(
+                    std::thread([i, sender] () mutable {
+                        for (uint64_t j = 0; j < messages_per_sender; j++) {
+                            sender.send(j + i * messages_per_sender);
+                        }
+                    })
+                );
+            }
+
+            std::vector<std::thread> receiver_threads;
+
+            for (uint64_t i = 0; i < total_receivers; i++) {
+                receiver_threads.push_back(
+                    std::thread([
+                        receiver,
+                        &message_mutex,
+                        &received_messages
+                    ] () mutable {
+                        bool disconnected = false;
+                        std::set<uint64_t> messages;
+                        while (!disconnected) {
+                            try {
+                                uint64_t message = receiver.receive();
+                                messages.insert(message);
+                            } catch (SendersDisconnected const& exc) {
+                                disconnected = true;
+                            }
+                        }
+
+                        std::unique_lock lock(message_mutex);
+                        received_messages.merge(messages);
+                    })
+                );
+            }
+
+            {
+                Channel<uint64_t>::Sender drop_sender = std::move(sender);
+                Channel<uint64_t>::Receiver drop_receiver = std::move(receiver);
+            }
+
+            for (auto& sender_thread : sender_threads) {
+                sender_thread.join();
+            }
+            for (auto& receiver_thread : receiver_threads) {
+                receiver_thread.join();
+            }
+
+            TEST_ASSERT(
+                std::string("total number of received messages is ")
+                    + std::to_string(received_messages.size()),
+                total_messages == received_messages.size()
+            );
+
+            uint64_t max_message = *received_messages.crbegin();
+            TEST_ASSERT(
+                std::string("maximum message is ")
+                    + std::to_string(max_message),
+                max_message = total_messages - 1
+            );
+        })
+;
 }
