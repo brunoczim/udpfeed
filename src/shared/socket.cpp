@@ -172,3 +172,102 @@ void Socket::close()
         ::close(this->sockfd);
     }
 }
+
+ReliableSocket::ReqSent::ReqSent(Channel<Message>::Receiver&& channel) :
+    channel(channel)
+{
+}
+
+Message ReliableSocket::ReqSent::receive_response() &&
+{
+    return std::move(*this).channel.receive();
+}
+
+ReliableSocket::ReceivedReq::ReceivedReq(
+    Channel<Message>::Sender&& channel,
+    Message req_message
+) :
+    channel(channel),
+    message(req_message)
+{
+}
+
+Message const& ReliableSocket::ReceivedReq::req_message() const
+{
+    return this->message;
+}
+
+void ReliableSocket::ReceivedReq::send_response(Message response) &&
+{
+    std::move(*this).channel.send(response);
+}
+
+ReliableSocket::Inner::Inner(Socket&& udp, uint64_t max_req_attempt) :
+    udp(std::move(udp)),
+    max_req_attempt(max_req_attempt)
+{
+}
+
+ReliableSocket::ReliableSocket(
+    Channel<std::pair<Message, Channel<Message>::Sender>>&&
+        send_channel,
+
+    Channel<std::pair<Message, Channel<Message>::Sender>>&&
+        receive_channel,
+
+    std::shared_ptr<Inner> inner
+) :
+    send_thread([
+        channel = std::move(send_channel.receiver),
+        inner = inner
+    ] {
+    }),
+    receive_thread([
+        channel = std::move(receive_channel.sender),
+        inner = inner
+    ] {
+    }),
+    send_channel(std::move(send_channel.sender)),
+    receive_channel(std::move(receive_channel.receiver))
+{
+}
+
+ReliableSocket::ReliableSocket(Socket&& udp, uint64_t max_req_attempt) :
+    ReliableSocket(
+        Channel<std::pair<Message, Channel<Message>::Sender>>(),
+        Channel<std::pair<Message, Channel<Message>::Sender>>(),
+        std::move(std::shared_ptr<ReliableSocket::Inner>(
+            new ReliableSocket::Inner(std::move(udp), max_req_attempt)
+        ))
+    )
+{
+}
+
+ReliableSocket::ReqSent ReliableSocket::send_req(Message message)
+{
+    Channel<Message> channel;
+    this->send_channel.send(std::make_pair(
+        message, std::move(channel.sender)
+    ));
+    ReliableSocket::ReqSent sent_req(std::move(channel.receiver));
+    return sent_req;
+}
+
+ReliableSocket::ReceivedReq ReliableSocket::receive_req()
+{
+
+    auto req_pair = this->receive_channel.receive();
+    Message message = std::move(std::get<0>(req_pair));
+    Channel<Message>::Sender channel = std::move(std::get<1>(req_pair));
+    return ReliableSocket::ReceivedReq(std::move(channel), message);
+}
+
+ReliableSocket::~ReliableSocket()
+{
+    {
+        auto send_channel = std::move(this->send_channel);
+        auto recv_channel = std::move(this->receive_channel);
+    }
+    this->send_thread.join();
+    this->receive_thread.join();
+}
