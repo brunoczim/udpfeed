@@ -50,10 +50,10 @@ class Socket {
 
         ~Socket();
 
-        Envelope receive();
-        std::optional<Envelope> receive(int timeout_ms);
+        Enveloped receive();
+        std::optional<Enveloped> receive(int timeout_ms);
 
-        void send(Envelope const& envelope);
+        void send(Enveloped const& enveloped);
     
     private:
         void close();
@@ -89,9 +89,9 @@ class ReliableSocket {
     private:
         class PendingResponse {
             public:
-                Envelope request;
+                Enveloped request;
                 uint64_t remaining_attempts;
-                Channel<Envelope>::Sender callback;
+                Channel<Enveloped>::Sender callback;
         };
 
         class Connection {
@@ -110,13 +110,13 @@ class ReliableSocket {
                 uint64_t max_req_attempt;
                 std::set<std::pair<Address, uint64_t>> pending_response_keys;
                 std::map<Address, Connection> connection;
-                Channel<Envelope>::Receiver handler_to_req_receiver;
+                Channel<Enveloped>::Receiver handler_to_req_receiver;
 
             public:
                 Inner(
                     Socket&& udp,
                     uint64_t max_req_attempt,
-                    Channel<Envelope>::Receiver&& handler_to_req_receiver
+                    Channel<Enveloped>::Receiver&& handler_to_req_receiver
                 );
         };
 
@@ -125,11 +125,11 @@ class ReliableSocket {
             private:
                 friend ReliableSocket;
 
-                Channel<Envelope>::Receiver channel;
+                Channel<Enveloped>::Receiver channel;
 
-                SentReq(Channel<Envelope>::Receiver&& channel);
+                SentReq(Channel<Enveloped>::Receiver&& channel);
             public:
-                Envelope receive_resp() &&;
+                Enveloped receive_resp() &&;
         };
 
         class ReceivedReq {
@@ -137,14 +137,14 @@ class ReliableSocket {
                 friend ReliableSocket;
 
                 std::shared_ptr<Inner> inner;
-                Envelope req_envelope_;
+                Enveloped req_enveloped_;
 
                 ReceivedReq(
                     std::shared_ptr<Inner> const& inner,
-                    Envelope req_envelope
+                    Enveloped req_enveloped
                 );
             public:
-                Envelope const& req_envelope() const;
+                Enveloped const& req_enveloped() const;
 
                 void send_resp(Message response) &&;
         };
@@ -157,21 +157,21 @@ class ReliableSocket {
 
         ReliableSocket(
             std::shared_ptr<ReliableSocket::Inner> inner,
-            Channel<Envelope>&& input_to_handler_channel,
-            Channel<Envelope>::Sender&& handler_to_req_receiver
+            Channel<Enveloped>&& input_to_handler_channel,
+            Channel<Enveloped>::Sender&& handler_to_req_receiver
         );
 
         ReliableSocket(
             Socket&& udp,
             uint64_t max_req_attempt,
-            Channel<Envelope>&& input_to_handler_channel,
-            Channel<Envelope>&& handler_to_recv_req_channel
+            Channel<Enveloped>&& input_to_handler_channel,
+            Channel<Enveloped>&& handler_to_recv_req_channel
         );
 
     public:
         ReliableSocket(Socket&& udp, uint64_t max_req_attempt);
 
-        SentReq send_req(Envelope message);
+        SentReq send_req(Enveloped message);
         ReceivedReq receive_req();
 
         ~ReliableSocket();

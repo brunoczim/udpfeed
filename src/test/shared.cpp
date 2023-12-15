@@ -404,16 +404,16 @@ static TestSuite socket_test_suite()
         .test("basic send and receive", [] {
             Socket client(500);
             Socket server(500, 8082);
-            Envelope envelope;
-            envelope.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
-            envelope.message;
-            envelope.message.header = MessageHeader::gen_request();
-            envelope.message.body = std::shared_ptr<MessageConnectReq>(
+            Enveloped enveloped;
+            enveloped.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
+            enveloped.message;
+            enveloped.message.header = MessageHeader::gen_request();
+            enveloped.message.body = std::shared_ptr<MessageConnectReq>(
                 new MessageConnectReq("bruno")
             );
             client.send(message);
 
-            Envelope received = server.receive();
+            Enveloped received = server.receive();
 
             TEST_ASSERT(
                 std::string("basic recevied ipv4 address is wrong, address: ")
@@ -447,7 +447,7 @@ static TestSuite socket_test_suite()
             Socket client(500);
             Socket server(500, 8082);
 
-            Envelope request;
+            Enveloped request;
             request.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             request.message.header = MessageHeader::gen_request();
             request.message.body = std::shared_ptr<MessageConnectReq>(
@@ -455,7 +455,7 @@ static TestSuite socket_test_suite()
             );
             client.send(request);
 
-            Envelope received_req = server.receive();
+            Enveloped received_req = server.receive();
 
             TEST_ASSERT(
                 "found " + received_req.message.body->tag().to_string(),
@@ -474,16 +474,16 @@ static TestSuite socket_test_suite()
                 casted_req_body.username == "bruno"
             );
 
-            Envelope response;
+            Enveloped response;
             response.remote = received_req.remote;
-            response.envelope.header =
+            response.enveloped.header =
                 MessageHeader::gen_response(received_req.header.seqn);
-            response.envelope.body = std::shared_ptr<MessageConnectResp>(
+            response.enveloped.body = std::shared_ptr<MessageConnectResp>(
                 new MessageConnectResp(MSG_OK)
             );
             server.send(response);
 
-            Envelope received_resp = client.receive();
+            Enveloped received_resp = client.receive();
 
             TEST_ASSERT(
                 "found " + received_resp.body->tag().to_string(),

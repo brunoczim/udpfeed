@@ -175,10 +175,10 @@ class Message : public Serializable, public Deserializable {
         virtual void deserialize(Deserializer& deserializer);
 };
 
-class Envelope {
+class Enveloped {
     public:
-        Envelope();
-        Envelope(Address remote, Message message);
+        Enveloped();
+        Enveloped(Address remote, Message message);
 
         Address remote;
         Message message;

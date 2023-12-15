@@ -355,11 +355,11 @@ void Message::deserialize(Deserializer& deserializer)
     deserializer >> *this->body;
 }
 
-Envelope::Envelope()
+Enveloped::Enveloped()
 {
 }
 
-Envelope::Envelope(Address remote, Message message) :
+Enveloped::Enveloped(Address remote, Message message) :
     remote(remote),
     message(message)
 {
