@@ -6,6 +6,7 @@
 #include <optional>
 #include <functional>
 #include <map>
+#include <set>
 #include <thread>
 #include "message.h"
 #include "address.h"
@@ -49,54 +50,48 @@ class Socket {
 
         ~Socket();
 
-        Message receive(Address &sender_addr_out);
-        std::optional<Message> receive(
-            int timeout_ms,
-            Address &sender_addr_out
-        );
+        Envelope receive();
+        std::optional<Envelope> receive(int timeout_ms);
 
-        void send(Message const& message, Address const& receiver_addr);
+        void send(Envelope const& envelope);
     
     private:
         void close();
 };
 
+/**
+ * # Problem
+ *
+ *  - Need to receive messages and pass them forward quickly.
+ *  - Need to periodically check requests and re-send them.
+ *
+ * # Solution
+ *
+ *  ## Threads
+ *
+ * Three extra threads:
+ * 
+ *  1. "input": receives messages and quickly pass them forward
+ *  2. "handler": gets received messages and process them
+ *  3. "bumper": periodically checks for requests not responded and resends them 
+ *
+ *  User sends directly.
+ *
+ *  ## Communication
+ *
+ *  - input sends messages to handler
+ *  - handler sends requests to users through 'receive_req'
+ *  - handler sends responses to users through 'receive_resp'
+ *  - users sends requests directly with callback through 'send_req'
+ *  - users sends responses directly without callback through 'send_resp'
+ */
 class ReliableSocket {
-    public:
-        class ReqSent {
-            private:
-                friend ReliableSocket;
-
-                Channel<Message>::Receiver channel;
-
-                ReqSent(Channel<Message>::Receiver&& channel);
-            public:
-                Message receive_response() &&;
-        };
-
-        class ReceivedReq {
-            private:
-                friend ReliableSocket;
-
-                Message message;
-
-                Channel<Message>::Sender channel;
-
-                ReceivedReq(
-                    Channel<Message>::Sender&& channel,
-                    Message req_message
-                );
-            public:
-                Message const& req_message() const;
-
-                void send_response(Message response) &&;
-        };
-
     private:
         class PendingResponse {
             public:
-                Message request;
+                Envelope request;
                 uint64_t remaining_attempts;
+                Channel<Envelope>::Sender callback;
         };
 
         class Connection {
@@ -113,37 +108,71 @@ class ReliableSocket {
             private:
                 Socket udp;
                 uint64_t max_req_attempt;
+                std::set<std::pair<Address, uint64_t>> pending_response_keys;
                 std::map<Address, Connection> connection;
+                Channel<Envelope>::Receiver handler_to_req_receiver;
+
             public:
-                Inner(Socket&& udp, uint64_t max_req_attempt);
+                Inner(
+                    Socket&& udp,
+                    uint64_t max_req_attempt,
+                    Channel<Envelope>::Receiver&& handler_to_req_receiver
+                );
         };
 
+    public:
+        class SentReq {
+            private:
+                friend ReliableSocket;
+
+                Channel<Envelope>::Receiver channel;
+
+                SentReq(Channel<Envelope>::Receiver&& channel);
+            public:
+                Envelope receive_resp() &&;
+        };
+
+        class ReceivedReq {
+            private:
+                friend ReliableSocket;
+
+                std::shared_ptr<Inner> inner;
+                Envelope req_envelope_;
+
+                ReceivedReq(
+                    std::shared_ptr<Inner> const& inner,
+                    Envelope req_envelope
+                );
+            public:
+                Envelope const& req_envelope() const;
+
+                void send_resp(Message response) &&;
+        };
+
+    private:
         std::shared_ptr<Inner> inner;
-
-        std::thread send_thread;
-        std::thread receive_thread;
-
-        Channel<std::pair<Message, Channel<Message>::Sender>>::Sender
-            send_channel;
-
-        Channel<std::pair<Message, Channel<Message>::Sender>>::Receiver
-            receive_channel;
+        std::thread input_thread;
+        std::thread handler_thread;
+        std::thread bumper_thread;
 
         ReliableSocket(
-            Channel<std::pair<Message, Channel<Message>::Sender>>&&
-                send_channel,
+            std::shared_ptr<ReliableSocket::Inner> inner,
+            Channel<Envelope>&& input_to_handler_channel,
+            Channel<Envelope>::Sender&& handler_to_req_receiver
+        );
 
-            Channel<std::pair<Message, Channel<Message>::Sender>>&&
-                receive_channel,
-
-            std::shared_ptr<Inner> inner
+        ReliableSocket(
+            Socket&& udp,
+            uint64_t max_req_attempt,
+            Channel<Envelope>&& input_to_handler_channel,
+            Channel<Envelope>&& handler_to_recv_req_channel
         );
 
     public:
         ReliableSocket(Socket&& udp, uint64_t max_req_attempt);
 
-        ReliableSocket::ReqSent send_req(Message message);
-        ReliableSocket::ReceivedReq receive_req();
+        SentReq send_req(Envelope message);
+        ReceivedReq receive_req();
 
         ~ReliableSocket();
 };

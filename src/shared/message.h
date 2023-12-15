@@ -2,6 +2,7 @@
 #define SHARED_MESSAGE_H_ 1
 
 #include "serialization.h"
+#include "address.h"
 
 #include <cstdint>
 #include <string>
@@ -78,7 +79,7 @@ class InvalidMessageType : public std::exception {
         virtual const char *what() const noexcept;
 };
 
-MessageType msg_tag_from_code(uint16_t code);
+MessageType msg_type_from_code(uint16_t code);
 
 Serializer& operator<<(Serializer& serializer, MessageType tag);
 Deserializer& operator>>(Deserializer& deserializer, MessageType &tag);
@@ -172,6 +173,15 @@ class Message : public Serializable, public Deserializable {
 
         virtual void serialize(Serializer& serializer) const;
         virtual void deserialize(Deserializer& deserializer);
+};
+
+class Envelope {
+    public:
+        Envelope();
+        Envelope(Address remote, Message message);
+
+        Address remote;
+        Message message;
 };
 
 #endif

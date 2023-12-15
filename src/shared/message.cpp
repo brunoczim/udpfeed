@@ -354,3 +354,13 @@ void Message::deserialize(Deserializer& deserializer)
     }
     deserializer >> *this->body;
 }
+
+Envelope::Envelope()
+{
+}
+
+Envelope::Envelope(Address remote, Message message) :
+    remote(remote),
+    message(message)
+{
+}

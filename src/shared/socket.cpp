@@ -86,7 +86,7 @@ Socket::~Socket()
     this->close();
 }
 
-Message Socket::receive(Address &sender_addr_out)
+Envelope Socket::receive()
 {
     struct sockaddr_in sender_addr;
     socklen_t sender_len = sizeof(sender_addr);
@@ -107,20 +107,22 @@ Message Socket::receive(Address &sender_addr_out)
             "Socket address unexpectedly has the wrong length"
         );
     }
-    sender_addr_out.ipv4 = ntohl(sender_addr.sin_addr.s_addr);
-    sender_addr_out.port = ntohs(sender_addr.sin_port);
+
+    Envelope envelope;
+
+    envelope.remote.ipv4 = ntohl(sender_addr.sin_addr.s_addr);
+    envelope.remote.port = ntohs(sender_addr.sin_port);
 
     buf.resize(count);
-
     std::istringstream istream(buf);
     PlaintextDeserializer deserializer_impl(istream);
     Deserializer& deserializer = deserializer_impl;
-    Message message;
-    deserializer >> message;
-    return message;
+    deserializer >> envelope.message;
+
+    return envelope;
 }
 
-std::optional<Message> Socket::receive(int timeout_ms, Address &sender_addr_out)
+std::optional<Envelope> Socket::receive(int timeout_ms)
 {
     struct pollfd fds[1];
     fds[0].fd = this->sockfd;
@@ -131,24 +133,24 @@ std::optional<Message> Socket::receive(int timeout_ms, Address &sender_addr_out)
         throw SocketIoError("socket poll");
     }
     if (fds[0].revents & POLLIN) {
-        return this->receive(sender_addr_out);
+        return this->receive();
     }
-    return std::optional<Message>();
+    return std::optional<Envelope>();
 }
 
-void Socket::send(Message const& message, Address const& receiver_addr)
+void Socket::send(Envelope const& envelope)
 {
     std::ostringstream ostream;
     PlaintextSerializer serializer_impl(ostream);
     Serializer& serializer = serializer_impl;
-    serializer << message;
+    serializer << envelope.message;
     std::string buf = ostream.str();
     
     struct sockaddr_in receiver_addr_in;
 
     receiver_addr_in.sin_family = AF_INET;
-    receiver_addr_in.sin_port = htons(receiver_addr.port);
-    receiver_addr_in.sin_addr.s_addr = htonl(receiver_addr.ipv4);
+    receiver_addr_in.sin_port = htons(envelope.remote.port);
+    receiver_addr_in.sin_addr.s_addr = htonl(envelope.remote.ipv4);
     bzero(&receiver_addr_in.sin_zero, 8);
 
     ssize_t result = sendto(
@@ -173,101 +175,85 @@ void Socket::close()
     }
 }
 
-ReliableSocket::ReqSent::ReqSent(Channel<Message>::Receiver&& channel) :
+ReliableSocket::Inner::Inner(
+    Socket&& udp,
+    uint64_t max_req_attempt,
+    Channel<Envelope>::Receiver&& handler_to_req_receiver
+) :
+    udp(std::move(udp)),
+    max_req_attempt(max_req_attempt),
+    handler_to_req_receiver(handler_to_req_receiver)
+{
+}
+
+ReliableSocket::SentReq::SentReq(Channel<Envelope>::Receiver&& channel) :
     channel(channel)
 {
 }
 
-Message ReliableSocket::ReqSent::receive_response() &&
+Envelope ReliableSocket::SentReq::receive_resp() &&
 {
     return std::move(*this).channel.receive();
 }
 
 ReliableSocket::ReceivedReq::ReceivedReq(
-    Channel<Message>::Sender&& channel,
-    Message req_message
+    std::shared_ptr<Inner> const& inner,
+    Envelope req_envelope
 ) :
-    channel(channel),
-    message(req_message)
+    inner(inner),
+    req_envelope_(req_envelope)
 {
 }
 
-Message const& ReliableSocket::ReceivedReq::req_message() const
+Envelope const& ReliableSocket::ReceivedReq::req_envelope() const
 {
-    return this->message;
+    return this->req_envelope_;
 }
 
-void ReliableSocket::ReceivedReq::send_response(Message response) &&
+void ReliableSocket::ReceivedReq::send_resp(Message response) &&
 {
-    std::move(*this).channel.send(response);
+    // TODO
 }
 
-ReliableSocket::Inner::Inner(Socket&& udp, uint64_t max_req_attempt) :
-    udp(std::move(udp)),
-    max_req_attempt(max_req_attempt)
+ReliableSocket::ReliableSocket(
+    std::shared_ptr<ReliableSocket::Inner> inner,
+    Channel<Envelope>&& input_to_handler_channel,
+    Channel<Envelope>::Sender&& handler_to_req_receiver
+) :
+    inner(inner),
+    input_thread([] {
+    }),
+    handler_thread([] {
+    }),
+    bumper_thread([] {
+    })
 {
 }
 
 ReliableSocket::ReliableSocket(
-    Channel<std::pair<Message, Channel<Message>::Sender>>&&
-        send_channel,
-
-    Channel<std::pair<Message, Channel<Message>::Sender>>&&
-        receive_channel,
-
-    std::shared_ptr<Inner> inner
+    Socket&& udp,
+    uint64_t max_req_attempt,
+    Channel<Envelope>&& input_to_handler_channel,
+    Channel<Envelope>&& handler_to_recv_req_channel
 ) :
-    send_thread([
-        channel = std::move(send_channel.receiver),
-        inner = inner
-    ] {
-    }),
-    receive_thread([
-        channel = std::move(receive_channel.sender),
-        inner = inner
-    ] {
-    }),
-    send_channel(std::move(send_channel.sender)),
-    receive_channel(std::move(receive_channel.receiver))
+    ReliableSocket(
+        std::shared_ptr<Inner>(new Inner(
+            std::move(udp),
+            max_req_attempt,
+            std::move(handler_to_recv_req_channel.receiver)
+        )),
+        std::move(input_to_handler_channel),
+        std::move(handler_to_recv_req_channel.sender)
+    )
 {
 }
 
 ReliableSocket::ReliableSocket(Socket&& udp, uint64_t max_req_attempt) :
     ReliableSocket(
-        Channel<std::pair<Message, Channel<Message>::Sender>>(),
-        Channel<std::pair<Message, Channel<Message>::Sender>>(),
-        std::move(std::shared_ptr<ReliableSocket::Inner>(
-            new ReliableSocket::Inner(std::move(udp), max_req_attempt)
-        ))
+        std::move(udp),
+        max_req_attempt,
+        Channel<Envelope>(),
+        Channel<Envelope>()
     )
 {
-}
-
-ReliableSocket::ReqSent ReliableSocket::send_req(Message message)
-{
-    Channel<Message> channel;
-    this->send_channel.send(std::make_pair(
-        message, std::move(channel.sender)
-    ));
-    ReliableSocket::ReqSent sent_req(std::move(channel.receiver));
-    return sent_req;
-}
-
-ReliableSocket::ReceivedReq ReliableSocket::receive_req()
-{
-
-    auto req_pair = this->receive_channel.receive();
-    Message message = std::move(std::get<0>(req_pair));
-    Channel<Message>::Sender channel = std::move(std::get<1>(req_pair));
-    return ReliableSocket::ReceivedReq(std::move(channel), message);
-}
-
-ReliableSocket::~ReliableSocket()
-{
-    {
-        auto send_channel = std::move(this->send_channel);
-        auto recv_channel = std::move(this->receive_channel);
-    }
-    this->send_thread.join();
-    this->receive_thread.join();
 }
