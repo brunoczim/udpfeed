@@ -178,30 +178,25 @@ void Socket::close()
 
 UnexpectedMessageStep::UnexpectedMessageStep(
     char const *expected,
-    MessageHeader header,
-    MessageTag tag
+    Enveloped enveloped
 ) :
-    header_(header),
-    tag_(tag),
+    enveloped_(enveloped),
     message("expected ")
 {
     this->message += expected;
     this->message += ", got message with tag = ";
-    this->message += tag.to_string();
+    this->message += enveloped.message.body->tag().to_string();
     this->message += ", seqn = ";
-    this->message += std::to_string(header.seqn);
+    this->message += std::to_string(enveloped.message.header.seqn);
     this->message += ", timestamp = ";
-    this->message += std::to_string(header.timestamp);
+    this->message += std::to_string(enveloped.message.header.timestamp);
+    this->message += ", from ";
+    this->message += enveloped.remote.to_string();
 }
 
-MessageHeader UnexpectedMessageStep::header() const
+Enveloped UnexpectedMessageStep::enveloped() const
 {
-    return this->header_;
-}
-
-MessageTag UnexpectedMessageStep::tag() const
-{
-    return this->tag_;
+    return this->enveloped_;
 }
 
 char const *UnexpectedMessageStep::what() const noexcept
@@ -213,14 +208,60 @@ UnexpectedMessageStep::~UnexpectedMessageStep()
 {
 }
 
-ExpectedRequest::ExpectedRequest(MessageHeader header, MessageTag tag) :
-    UnexpectedMessageStep("request", header, tag)
+ExpectedRequest::ExpectedRequest(Enveloped enveloped) :
+    UnexpectedMessageStep("request", enveloped)
 {
 }
 
-ExpectedResponse::ExpectedResponse(MessageHeader header, MessageTag tag) :
-    UnexpectedMessageStep("response", header, tag)
+ExpectedResponse::ExpectedResponse(Enveloped enveloped) :
+    UnexpectedMessageStep("response", enveloped)
 {
+}
+
+ReceivedOutdatedReq::ReceivedOutdatedReq(Enveloped enveloped) :
+    enveloped_(enveloped),
+    message("received out of date request with tag = ")
+{
+    this->message += enveloped.message.body->tag().to_string();
+    this->message += ", seqn = ";
+    this->message += std::to_string(enveloped.message.header.seqn);
+    this->message += ", timestamp = ";
+    this->message += std::to_string(enveloped.message.header.timestamp);
+    this->message += ", from ";
+    this->message += enveloped.remote.to_string();
+}
+
+Enveloped ReceivedOutdatedReq::enveloped() const
+{
+    return this->enveloped_;
+}
+
+char const *ReceivedOutdatedReq::what() const noexcept
+{
+    return this->message.c_str();
+}
+
+ReceivedUnknownResp::ReceivedUnknownResp(Enveloped enveloped) :
+    enveloped_(enveloped),
+    message("received a response to unknown message with tag = ")
+{
+    this->message += enveloped.message.body->tag().to_string();
+    this->message += ", seqn = ";
+    this->message += std::to_string(enveloped.message.header.seqn);
+    this->message += ", timestamp = ";
+    this->message += std::to_string(enveloped.message.header.timestamp);
+    this->message += ", from ";
+    this->message += enveloped.remote.to_string();
+}
+
+Enveloped ReceivedUnknownResp::enveloped() const
+{
+    return this->enveloped_;
+}
+
+char const *ReceivedUnknownResp::what() const noexcept
+{
+    return this->message.c_str();
 }
 
 ReliableSocket::PendingResponse::PendingResponse(
@@ -240,11 +281,11 @@ ReliableSocket::Connection::Connection() : Connection(10, 20, Enveloped())
 
 ReliableSocket::Connection::Connection(
     uint64_t max_req_attemtps,
-    uint64_t max_cached_responses,
+    uint64_t max_cached_sent_resps,
     Enveloped connect_request
 ) :
     max_req_attemtps(max_req_attemtps),
-    max_cached_responses(max_cached_responses),
+    max_cached_sent_resps(max_cached_sent_resps),
     min_accepted_req_seqn(0),
     estabilished(false),
     remote_address(connect_request.remote)
@@ -254,12 +295,12 @@ ReliableSocket::Connection::Connection(
 ReliableSocket::Inner::Inner(
     Socket&& udp,
     uint64_t max_req_attempts,
-    uint64_t max_cached_responses,
+    uint64_t max_cached_sent_resps,
     Channel<Enveloped>::Receiver&& handler_to_req_receiver
 ) :
     udp(std::move(udp)),
     max_req_attempts(max_req_attempts),
-    max_cached_responses(max_cached_responses),
+    max_cached_sent_resps(max_cached_sent_resps),
     handler_to_req_receiver(handler_to_req_receiver)
 {
 }
@@ -275,10 +316,7 @@ void ReliableSocket::Inner::send_req(
 )
 {
     if (enveloped.message.body->tag().step != MSG_REQ) {
-        throw ExpectedRequest(
-            enveloped.message.header,
-            enveloped.message.body->tag()
-        );
+        throw ExpectedRequest(enveloped);
     }
 
     std::unique_lock lock(this->net_control_mutex);
@@ -286,7 +324,7 @@ void ReliableSocket::Inner::send_req(
     if (enveloped.message.body->tag().type == MSG_CONNECT) { 
         this->connections.insert(std::make_pair(enveloped.remote, Connection(
             this->max_req_attempts,
-            this->max_cached_responses,
+            this->max_cached_sent_resps,
             enveloped
         )));
     }
@@ -304,27 +342,24 @@ void ReliableSocket::Inner::send_req(
 void ReliableSocket::Inner::send_resp(Enveloped enveloped)
 {
     if (enveloped.message.body->tag().step != MSG_RESP) {
-        throw ExpectedResponse(
-            enveloped.message.header,
-            enveloped.message.body->tag()
-        );
+        throw ExpectedResponse(enveloped);
     }
 
     std::unique_lock lock(this->net_control_mutex);
 
     Connection& connection = this->connections[enveloped.remote];
     if (
-        connection.cached_response_queue.size()
-        < connection.max_cached_responses
+        connection.cached_sent_resp_queue.size()
+        < connection.max_cached_sent_resps
     ) {
-        connection.cached_responses.erase(
-            connection.cached_response_queue.front()
+        connection.cached_sent_resps.erase(
+            connection.cached_sent_resp_queue.front()
         );
-        connection.cached_response_queue.pop();
+        connection.cached_sent_resp_queue.pop();
     }
 
-    connection.cached_response_queue.push(enveloped.message.header.seqn);
-    connection.cached_responses.insert(std::make_pair(
+    connection.cached_sent_resp_queue.push(enveloped.message.header.seqn);
+    connection.cached_sent_resps.insert(std::make_pair(
         enveloped.message.header.seqn,
         enveloped
     ));
@@ -344,6 +379,36 @@ Enveloped ReliableSocket::Inner::receive()
 void ReliableSocket::Inner::handle(Enveloped enveloped)
 {
     std::unique_lock lock(this->net_control_mutex);
+
+    switch (enveloped.message.body->tag().step) {
+        case MSG_REQ:
+            break;
+
+        case MSG_RESP:
+            if (
+                auto conn_search = this->connections.find(enveloped.remote);
+                conn_search != this->connections.end()
+            ) {
+                Connection& connection = std::get<1>(*conn_search);
+                if (auto pending_node = connection.pending_responses.extract(
+                    enveloped.message.header.seqn
+                )) {
+                    PendingResponse pending = std::move(pending_node.mapped());
+                    pending.callback.send(enveloped);
+                } else {
+                    throw ReceivedUnknownResp(enveloped);
+                }
+                if (enveloped.message.body->tag().type == MSG_CONNECT) {
+                    connection.estabilished = true;
+                }
+            } else {
+                throw ReceivedUnknownResp(enveloped);
+            }
+            if (enveloped.message.body->tag().type == MSG_DISCONNECT) {
+                this->connections.erase(enveloped.remote);
+            }
+            break;
+    }
 }
 
 void ReliableSocket::Inner::bump()
@@ -383,7 +448,7 @@ void ReliableSocket::Inner::bump()
 
 ReliableSocket::Config::Config() :
     max_req_attempts(10),
-    max_cached_responses(25),
+    max_cached_sent_resps(25),
     bump_interval_nanos(500 * 100)
 {
 }
@@ -396,11 +461,11 @@ ReliableSocket::Config& ReliableSocket::Config::with_max_req_attempts(
     return *this;
 }
 
-ReliableSocket::Config& ReliableSocket::Config::with_max_cached_responses(
+ReliableSocket::Config& ReliableSocket::Config::with_max_cached_sent_resps(
     uint64_t val
 )
 {
-    this->max_cached_responses = val;
+    this->max_cached_sent_resps = val;
     return *this;
 }
 
@@ -498,7 +563,7 @@ ReliableSocket::ReliableSocket(
         std::shared_ptr<Inner>(new Inner(
             std::move(udp),
             config.max_req_attempts,
-            config.max_cached_responses,
+            config.max_cached_sent_resps,
             std::move(handler_to_recv_req_channel.receiver)
         )),
         config.bump_interval_nanos,

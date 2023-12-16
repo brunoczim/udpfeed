@@ -61,20 +61,14 @@ class Socket {
 
 class UnexpectedMessageStep : public std::exception {
     private:
-        MessageHeader header_;
-        MessageTag tag_;
+        Enveloped enveloped_;
         std::string message;
 
     protected:
-        UnexpectedMessageStep(
-            char const *expected,
-            MessageHeader header,
-            MessageTag tag
-        );
+        UnexpectedMessageStep(char const *expected, Enveloped enveloped);
 
     public:
-        MessageHeader header() const;
-        MessageTag tag() const;
+        Enveloped enveloped() const;
 
         virtual char const *what() const noexcept;
         
@@ -83,12 +77,34 @@ class UnexpectedMessageStep : public std::exception {
 
 class ExpectedRequest : public UnexpectedMessageStep {
     public:
-        ExpectedRequest(MessageHeader header, MessageTag tag);
+        ExpectedRequest(Enveloped enveloped);
 };
 
 class ExpectedResponse : public UnexpectedMessageStep {
     public:
-        ExpectedResponse(MessageHeader header, MessageTag tag);
+        ExpectedResponse(Enveloped enveloped);
+};
+
+class ReceivedOutdatedReq : public std::exception {
+    private:
+        Enveloped enveloped_;
+        std::string message;
+    public:
+        ReceivedOutdatedReq(Enveloped enveloped);
+        Enveloped enveloped() const;
+
+        virtual char const *what() const noexcept;
+};
+
+class ReceivedUnknownResp : public std::exception {
+    private:
+        Enveloped enveloped_;
+        std::string message;
+    public:
+        ReceivedUnknownResp(Enveloped enveloped);
+        Enveloped enveloped() const;
+
+        virtual char const *what() const noexcept;
 };
 
 /**
@@ -137,17 +153,17 @@ class ReliableSocket {
                 bool estabilished;
                 Address remote_address;
                 uint64_t max_req_attemtps;
-                uint64_t max_cached_responses;
+                uint64_t max_cached_sent_resps;
                 uint64_t min_accepted_req_seqn;
-                std::queue<uint64_t> cached_response_queue;
-                std::map<uint64_t, Enveloped> cached_responses;
+                std::queue<uint64_t> cached_sent_resp_queue;
+                std::map<uint64_t, Enveloped> cached_sent_resps;
                 std::map<uint64_t, PendingResponse> pending_responses;
 
                 Connection();
 
                 Connection(
                     uint64_t max_req_attemtps,
-                    uint64_t max_cached_responses,
+                    uint64_t max_cached_sent_resps,
                     Enveloped connect_request
                 );
         };
@@ -156,7 +172,7 @@ class ReliableSocket {
             private:
                 Socket udp;
                 uint64_t max_req_attempts;
-                uint64_t max_cached_responses;
+                uint64_t max_cached_sent_resps;
                 Channel<Enveloped>::Receiver handler_to_req_receiver;
 
                 std::mutex net_control_mutex;
@@ -166,7 +182,7 @@ class ReliableSocket {
                 Inner(
                     Socket&& udp,
                     uint64_t max_req_attempts,
-                    uint64_t max_cached_responses,
+                    uint64_t max_cached_sent_resps,
                     Channel<Enveloped>::Receiver&& handler_to_req_receiver
                 );
 
@@ -192,13 +208,13 @@ class ReliableSocket {
         class Config {
             public:
                 uint64_t max_req_attempts;
-                uint64_t max_cached_responses;
+                uint64_t max_cached_sent_resps;
                 uint64_t bump_interval_nanos;
 
                 Config();
 
                 Config& with_max_req_attempts(uint64_t val);
-                Config& with_max_cached_responses(uint64_t val);
+                Config& with_max_cached_sent_resps(uint64_t val);
                 Config& with_bump_interval_nanos(uint64_t val);
         };
 
