@@ -223,6 +223,34 @@ ExpectedResponse::ExpectedResponse(MessageHeader header, MessageTag tag) :
 {
 }
 
+ReliableSocket::PendingResponse::PendingResponse(
+    Enveloped enveloped,
+    uint64_t max_req_attempts,
+    Channel<Enveloped>::Sender&& callback
+) :
+    request(enveloped),
+    remaining_attempts(max_req_attempts),
+    callback(callback)
+{
+}
+
+ReliableSocket::Connection::Connection() : Connection(10, 20, Enveloped())
+{
+}
+
+ReliableSocket::Connection::Connection(
+    uint64_t max_req_attemtps,
+    uint64_t max_cached_responses,
+    Enveloped connect_request
+) :
+    max_req_attemtps(max_req_attemtps),
+    max_cached_responses(max_cached_responses),
+    min_accepted_req_seqn(0),
+    estabilished(false),
+    remote_address(connect_request.remote)
+{
+}
+
 ReliableSocket::Inner::Inner(
     Socket&& udp,
     uint64_t max_req_attempts,

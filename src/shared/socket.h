@@ -134,7 +134,7 @@ class ReliableSocket {
 
         class Connection {
             public:
-                bool stabilished;
+                bool estabilished;
                 Address remote_address;
                 uint64_t max_req_attemtps;
                 uint64_t max_cached_responses;
@@ -142,7 +142,9 @@ class ReliableSocket {
                 std::queue<uint64_t> cached_response_queue;
                 std::map<uint64_t, Enveloped> cached_responses;
                 std::map<uint64_t, PendingResponse> pending_responses;
-                
+
+                Connection();
+
                 Connection(
                     uint64_t max_req_attemtps,
                     uint64_t max_cached_responses,
