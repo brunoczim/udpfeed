@@ -59,6 +59,38 @@ class Socket {
         void close();
 };
 
+class UnexpectedMessageStep : public std::exception {
+    private:
+        MessageHeader header_;
+        MessageTag tag_;
+        std::string message;
+
+    protected:
+        UnexpectedMessageStep(
+            char const *expected,
+            MessageHeader header,
+            MessageTag tag
+        );
+
+    public:
+        MessageHeader header() const;
+        MessageTag tag() const;
+
+        virtual char const *what() const noexcept;
+        
+        virtual ~UnexpectedMessageStep();
+};
+
+class ExpectedRequest : public UnexpectedMessageStep {
+    public:
+        ExpectedRequest(MessageHeader header, MessageTag tag);
+};
+
+class ExpectedResponse : public UnexpectedMessageStep {
+    public:
+        ExpectedResponse(MessageHeader header, MessageTag tag);
+};
+
 /**
  * # Problem
  *
@@ -92,35 +124,82 @@ class ReliableSocket {
                 Enveloped request;
                 uint64_t remaining_attempts;
                 Channel<Enveloped>::Sender callback;
+
+                PendingResponse(
+                    Enveloped enveloped,
+                    uint64_t max_req_attempts,
+                    Channel<Enveloped>::Sender&& callback
+                );
         };
 
         class Connection {
             public:
+                bool stabilished;
                 Address remote_address;
-                uint64_t max_attemtps;
+                uint64_t max_req_attemtps;
                 uint64_t max_cached_responses;
                 uint64_t min_accepted_req_seqn;
-                std::queue<Message> cached_responses;
+                std::queue<uint64_t> cached_response_queue;
+                std::map<uint64_t, Enveloped> cached_responses;
                 std::map<uint64_t, PendingResponse> pending_responses;
+                
+                Connection(
+                    uint64_t max_req_attemtps,
+                    uint64_t max_cached_responses,
+                    Enveloped connect_request
+                );
         };
 
         class Inner {
             private:
                 Socket udp;
-                uint64_t max_req_attempt;
-                std::set<std::pair<Address, uint64_t>> pending_response_keys;
-                std::map<Address, Connection> connection;
+                uint64_t max_req_attempts;
+                uint64_t max_cached_responses;
                 Channel<Enveloped>::Receiver handler_to_req_receiver;
+
+                std::mutex net_control_mutex;
+                std::map<Address, Connection> connections;
 
             public:
                 Inner(
                     Socket&& udp,
-                    uint64_t max_req_attempt,
+                    uint64_t max_req_attempts,
+                    uint64_t max_cached_responses,
                     Channel<Enveloped>::Receiver&& handler_to_req_receiver
                 );
+
+                bool is_connected();
+
+                void send_req(
+                    Enveloped enveloped,
+                    Channel<Enveloped>::Sender&& callback
+                );
+
+                void send_resp(Enveloped enveloped);
+
+                Enveloped receive_raw();
+
+                Enveloped receive();
+
+                void handle(Enveloped enveloped);
+
+                void bump();
         };
 
     public:
+        class Config {
+            public:
+                uint64_t max_req_attempts;
+                uint64_t max_cached_responses;
+                uint64_t bump_interval_nanos;
+
+                Config();
+
+                Config& with_max_req_attempts(uint64_t val);
+                Config& with_max_cached_responses(uint64_t val);
+                Config& with_bump_interval_nanos(uint64_t val);
+        };
+
         class SentReq {
             private:
                 friend ReliableSocket;
@@ -157,19 +236,23 @@ class ReliableSocket {
 
         ReliableSocket(
             std::shared_ptr<ReliableSocket::Inner> inner,
+            uint64_t bump_interval_nanos,
             Channel<Enveloped>&& input_to_handler_channel,
             Channel<Enveloped>::Sender&& handler_to_req_receiver
         );
 
         ReliableSocket(
             Socket&& udp,
-            uint64_t max_req_attempt,
+            Config config,
             Channel<Enveloped>&& input_to_handler_channel,
             Channel<Enveloped>&& handler_to_recv_req_channel
         );
 
     public:
-        ReliableSocket(Socket&& udp, uint64_t max_req_attempt);
+        ReliableSocket(
+            Socket&& udp,
+            Config config = Config()
+        );
 
         SentReq send_req(Enveloped message);
         ReceivedReq receive_req();
