@@ -656,18 +656,22 @@ static TestSuite reliable_socket_test_suite()
             );
             ReliableSocket::SentReq sent_conn_req = client.send_req(conn_req);
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-
-            /*
             ReliableSocket::ReceivedReq recvd_conn_req = server.receive_req();
-
             TEST_ASSERT(
                 "found " + recvd_conn_req.req_enveloped()
                     .message.body->tag().to_string(),
                 recvd_conn_req.req_enveloped().message.body->tag()
                     == MessageTag(MSG_REQ, MSG_CONNECT)
             );
-            */
+
+            Message conn_resp;
+            conn_resp.header = recvd_conn_req.req_enveloped().message.header; 
+            conn_resp.body = std::shared_ptr<MessageBody>(
+                new MessageConnectResp
+            );
+            std::move(recvd_conn_req).send_resp(conn_resp);
+
+            Enveloped recvd_conn_resp = std::move(sent_conn_req).receive_resp();
         })
     ;
 }

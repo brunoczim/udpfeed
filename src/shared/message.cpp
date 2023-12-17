@@ -388,6 +388,10 @@ void Message::deserialize(Deserializer& deserializer)
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageConnectResp);
                     break;
+                case MSG_ERROR:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageErrorResp);
+                    break;
                 case MSG_DISCONNECT:
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageDisconnectResp);

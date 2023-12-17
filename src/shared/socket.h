@@ -12,11 +12,6 @@
 #include "address.h"
 #include "channel.h"
 
-class SocketHasShutdown : public std::exception {
-    public:
-        virtual const char *what() const noexcept;
-};
-
 class SocketError : public std::exception {};
 
 class SocketIoError : public SocketError {
@@ -49,7 +44,7 @@ class Socket {
         Socket(size_t max_message_size);
         Socket(size_t max_message_size, uint16_t port);
         Socket(Socket&& other);
-        Socket(Socket const& obj) = delete;
+        Socket(Socket const& other) = delete;
         Socket& operator=(Socket const& obj) = delete;
         Socket& operator=(Socket&& obj);
 

@@ -10,11 +10,6 @@
 #include <sstream>
 #include <chrono>
 
-const char *SocketHasShutdown::what() const noexcept
-{
-    return "socket has shutdown";
-}
-
 SocketIoError::SocketIoError(std::string const& message) :
     c_errno_(errno),
     message(message),
@@ -72,18 +67,21 @@ Socket::Socket(size_t max_message_size, uint16_t port) :
     }
 }
 
-Socket::Socket(Socket&& other) : sockfd(other.sockfd)
+Socket::Socket(Socket&& other) :
+    sockfd(other.sockfd),
+    max_message_size(other.max_message_size)
 {
     other.sockfd = -1;
 }
 
-Socket& Socket::operator=(Socket&& obj)
+Socket& Socket::operator=(Socket&& other)
 {
-    if (this->sockfd != obj.sockfd) {
+    if (this->sockfd != other.sockfd) {
         this->close();
     }
-    this->sockfd = obj.sockfd;
-    obj.sockfd = -1;
+    this->max_message_size = other.max_message_size;
+    this->sockfd = other.sockfd;
+    other.sockfd = -1;
     return *this;
 }
 
@@ -107,9 +105,6 @@ Enveloped Socket::receive()
     );
     if (count < 0) {
         throw SocketIoError("socket recv");
-    }
-    if (count == 0) {
-        throw SocketHasShutdown();
     }
     if (sender_len != sizeof(sender_addr)) {
         throw InvalidAddrLen(
@@ -155,7 +150,7 @@ void Socket::send(Enveloped const& enveloped)
     Serializer& serializer = serializer_impl;
     serializer << enveloped.message;
     std::string buf = ostream.str();
-    
+
     struct sockaddr_in receiver_addr_in;
 
     receiver_addr_in.sin_family = AF_INET;
@@ -180,7 +175,6 @@ void Socket::send(Enveloped const& enveloped)
 void Socket::close()
 {
     if (this->sockfd >= 0) {
-        shutdown(this->sockfd, SHUT_RDWR);
         ::close(this->sockfd);
     }
 }
@@ -368,8 +362,11 @@ void ReliableSocket::Inner::unsafe_send_resp(Enveloped enveloped)
 std::optional<Enveloped> ReliableSocket::Inner::receive_raw(int poll_timeout_ms)
 {
     while (this->is_connected()) {
-        if (auto enveloped = this->udp.receive(poll_timeout_ms)) {
-            return std::optional<Enveloped>(enveloped);
+        try {
+            if (auto enveloped = this->udp.receive(poll_timeout_ms)) {
+                return std::optional<Enveloped>(enveloped);
+            }
+        } catch (MessageOutOfProtocol const &exc) {
         }
     }
     return std::optional<Enveloped>();
