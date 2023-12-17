@@ -218,29 +218,6 @@ ExpectedResponse::ExpectedResponse(Enveloped enveloped) :
 {
 }
 
-ReceivedOutdatedReq::ReceivedOutdatedReq(Enveloped enveloped) :
-    enveloped_(enveloped),
-    message("received out of date request with tag = ")
-{
-    this->message += enveloped.message.body->tag().to_string();
-    this->message += ", seqn = ";
-    this->message += std::to_string(enveloped.message.header.seqn);
-    this->message += ", timestamp = ";
-    this->message += std::to_string(enveloped.message.header.timestamp);
-    this->message += ", from ";
-    this->message += enveloped.remote.to_string();
-}
-
-Enveloped ReceivedOutdatedReq::enveloped() const
-{
-    return this->enveloped_;
-}
-
-char const *ReceivedOutdatedReq::what() const noexcept
-{
-    return this->message.c_str();
-}
-
 ReceivedUnknownResp::ReceivedUnknownResp(Enveloped enveloped) :
     enveloped_(enveloped),
     message("received a response to unknown message with tag = ")
@@ -287,7 +264,6 @@ ReliableSocket::Connection::Connection(
     max_req_attemtps(max_req_attemtps),
     max_cached_sent_resps(max_cached_sent_resps),
     min_accepted_req_seqn(0),
-    estabilished(false),
     remote_address(connect_request.remote)
 {
 }
@@ -321,6 +297,8 @@ void ReliableSocket::Inner::send_req(
 
     std::unique_lock lock(this->net_control_mutex);
 
+    enveloped.message.header.fill_req();
+
     if (enveloped.message.body->tag().type == MSG_CONNECT) { 
         this->connections.insert(std::make_pair(enveloped.remote, Connection(
             this->max_req_attempts,
@@ -347,7 +325,15 @@ void ReliableSocket::Inner::send_resp(Enveloped enveloped)
 
     std::unique_lock lock(this->net_control_mutex);
 
+    this->unsafe_send_resp(enveloped);
+}
+
+void ReliableSocket::Inner::unsafe_send_resp(Enveloped enveloped)
+{
     Connection& connection = this->connections[enveloped.remote];
+
+    enveloped.message.header.fill_resp(enveloped.message.header.seqn);
+
     if (
         connection.cached_sent_resp_queue.size()
         < connection.max_cached_sent_resps
@@ -376,52 +362,127 @@ Enveloped ReliableSocket::Inner::receive()
     return this->handler_to_req_receiver.receive();
 }
 
-void ReliableSocket::Inner::handle(Enveloped enveloped)
+std::optional<Enveloped> ReliableSocket::Inner::handle(Enveloped enveloped)
 {
     std::unique_lock lock(this->net_control_mutex);
 
     switch (enveloped.message.body->tag().step) {
         case MSG_REQ:
-            break;
+            return this->unsafe_handle_req(enveloped);
 
         case MSG_RESP:
-            if (
-                auto conn_search = this->connections.find(enveloped.remote);
-                conn_search != this->connections.end()
-            ) {
-                Connection& connection = std::get<1>(*conn_search);
-                if (auto pending_node = connection.pending_responses.extract(
-                    enveloped.message.header.seqn
-                )) {
-                    PendingResponse pending = std::move(pending_node.mapped());
-                    pending.callback.send(enveloped);
-                } else {
-                    throw ReceivedUnknownResp(enveloped);
-                }
-                if (enveloped.message.body->tag().type == MSG_CONNECT) {
-                    connection.estabilished = true;
-                }
-            } else {
-                throw ReceivedUnknownResp(enveloped);
-            }
-            if (enveloped.message.body->tag().type == MSG_DISCONNECT) {
-                this->connections.erase(enveloped.remote);
-            }
+            this->unsafe_handle_resp(enveloped);
             break;
+    }
+
+    return std::optional<Enveloped>();
+}
+
+std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
+    Enveloped enveloped
+)
+{
+    if (this->connections.find(enveloped.remote) == this->connections.end()) {
+        switch (enveloped.message.body->tag().type) {
+            case MSG_CONNECT:
+                this->connections.insert(std::make_pair(
+                    enveloped.remote,
+                    Connection(
+                        this->max_req_attempts,
+                        this->max_cached_sent_resps,
+                        enveloped
+                    )
+                ));
+                break;
+
+            case MSG_DISCONNECT: {
+                Enveloped response;
+                response.remote = enveloped.remote;
+                response.message.header = enveloped.message.header;
+                response.message.body = std::shared_ptr<MessageBody>(
+                    new MessageDisconnectResp
+                );
+                this->udp.send(response);
+                return std::optional<Enveloped>();
+            }
+
+            default: {
+                Enveloped response;
+                response.remote = enveloped.remote;
+                response.message.header = enveloped.message.header;
+                response.message.body = std::shared_ptr<MessageBody>(
+                    new MessageErrorResp(MSG_NO_CONNECTION)
+                );
+                this->udp.send(response);
+                return std::optional<Enveloped>();
+            }
+        }
+    }
+
+    Connection& connection = this->connections[enveloped.remote];
+
+     if (
+        auto resp_search =
+            connection.cached_sent_resps.find(enveloped.message.header.seqn);
+        resp_search != connection.cached_sent_resps.end()
+    ) {
+        Enveloped response = std::get<1>(*resp_search);
+        this->udp.send(response);
+    } else if (
+        connection.min_accepted_req_seqn > enveloped.message.header.seqn
+    ) {
+        Enveloped response;
+        response.remote = enveloped.remote;
+        response.message.header = enveloped.message.header;
+        response.message.body = std::shared_ptr<MessageBody>(
+            new MessageErrorResp(MSG_OUTDATED_SEQN)
+        );
+        this->udp.send(response);
+    } else {
+        connection.min_accepted_req_seqn = enveloped.message.header.seqn;
+        return std::make_optional(enveloped);
+    }
+
+    return std::optional<Enveloped>();
+}
+
+void ReliableSocket::Inner::unsafe_handle_resp(Enveloped enveloped)
+{
+    if (
+        auto conn_search = this->connections.find(enveloped.remote);
+        conn_search != this->connections.end()
+    ) {
+        Connection& connection = std::get<1>(*conn_search);
+        if (auto pending_node = connection.pending_responses.extract(
+            enveloped.message.header.seqn
+        )) {
+            PendingResponse pending = std::move(pending_node.mapped());
+            pending.callback.send(enveloped);
+        } else {
+            throw ReceivedUnknownResp(enveloped);
+        }
+    } else {
+        throw ReceivedUnknownResp(enveloped);
+    }
+    if (enveloped.message.body->tag().type == MSG_DISCONNECT) {
+        this->connections.erase(enveloped.remote);
     }
 }
 
 void ReliableSocket::Inner::bump()
 {
     std::unique_lock lock(this->net_control_mutex);
+
     std::set<uint64_t> seqn_to_be_removed;
     std::set<Address> addresses_to_be_removed;
     for (auto& conn_entry : this->connections) {
-        Address const& address = std::get<0>(conn_entry);
+        Address address = std::get<0>(conn_entry);
         Connection& connection = std::get<1>(conn_entry);
+
         for (auto& pending_entry : connection.pending_responses) {
             uint64_t seqn = std::get<0>(pending_entry);
             PendingResponse& pending = std::get<1>(pending_entry);
+
             if (pending.remaining_attempts == 0) {
                 seqn_to_be_removed.insert(seqn);
                 if (
@@ -532,14 +593,17 @@ ReliableSocket::ReliableSocket(
 
     handler_thread([
         inner,
-        channel = std::move(input_to_handler_channel.receiver)
+        from_input = std::move(input_to_handler_channel.receiver),
+        to_req_receiver = std::move(handler_to_req_receiver)
     ] () mutable {
         try {
             for (;;) {
-                Enveloped enveloped = channel.receive();
-                inner->handle(enveloped);
+                Enveloped enveloped = from_input.receive();
+                if (auto request = inner->handle(enveloped)) {
+                    to_req_receiver.send(*request);
+                }
             }
-        } catch (SendersDisconnected const& exc) {
+        } catch (ChannelDisconnected const& exc) {
         }
     }),
 

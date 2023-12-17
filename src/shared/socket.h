@@ -85,17 +85,6 @@ class ExpectedResponse : public UnexpectedMessageStep {
         ExpectedResponse(Enveloped enveloped);
 };
 
-class ReceivedOutdatedReq : public std::exception {
-    private:
-        Enveloped enveloped_;
-        std::string message;
-    public:
-        ReceivedOutdatedReq(Enveloped enveloped);
-        Enveloped enveloped() const;
-
-        virtual char const *what() const noexcept;
-};
-
 class ReceivedUnknownResp : public std::exception {
     private:
         Enveloped enveloped_;
@@ -150,7 +139,6 @@ class ReliableSocket {
 
         class Connection {
             public:
-                bool estabilished;
                 Address remote_address;
                 uint64_t max_req_attemtps;
                 uint64_t max_cached_sent_resps;
@@ -195,11 +183,17 @@ class ReliableSocket {
 
                 void send_resp(Enveloped enveloped);
 
+                void unsafe_send_resp(Enveloped enveloped);
+
                 Enveloped receive_raw();
 
                 Enveloped receive();
 
-                void handle(Enveloped enveloped);
+                std::optional<Enveloped> handle(Enveloped enveloped);
+                
+                std::optional<Enveloped> unsafe_handle_req(Enveloped enveloped);
+
+                void unsafe_handle_resp(Enveloped enveloped);
 
                 void bump();
         };

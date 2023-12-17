@@ -95,45 +95,47 @@ Deserializer& operator>>(Deserializer& deserializer, MessageType &type)
     return deserializer;
 }
 
-InvalidMessageStatus::InvalidMessageStatus(uint16_t code) :
-    message("invalid message status code: "),
+InvalidMessageError::InvalidMessageError(uint16_t code) :
+    message("invalid message error code: "),
     code_(code)
 {
     this->message += std::to_string(code);
 }
 
-uint16_t InvalidMessageStatus::code() const
+uint16_t InvalidMessageError::code() const
 {
     return this->code_;
 }
 
-const char *InvalidMessageStatus::what() const noexcept
+const char *InvalidMessageError::what() const noexcept
 {
     return this->message.c_str();
 }
 
-MessageStatus msg_status_from_code(uint16_t code)
+MessageError msg_error_from_code(uint16_t code)
 {
     switch (code) {
-        case MSG_OK: return MSG_OK;
+        case MSG_INTERNAL_ERR: return MSG_INTERNAL_ERR;
+        case MSG_NO_CONNECTION: return MSG_NO_CONNECTION;
+        case MSG_OUTDATED_SEQN: return MSG_OUTDATED_SEQN;
         case MSG_BAD_USERNAME: return MSG_BAD_USERNAME;
         case MSG_TOO_MANY_SESSIONS: return MSG_TOO_MANY_SESSIONS;
-        default: throw InvalidMessageStatus(code);
+        default: throw InvalidMessageError(code);
     }
 }
 
-Serializer& operator<<(Serializer& serializer, MessageStatus status)
+Serializer& operator<<(Serializer& serializer, MessageError error)
 {
-    uint16_t code = status;
+    uint16_t code = error;
     serializer << code;
     return serializer;
 }
 
-Deserializer& operator>>(Deserializer& deserializer, MessageStatus& status)
+Deserializer& operator>>(Deserializer& deserializer, MessageError& error)
 {
     uint16_t code;
     deserializer >> code;
-    status = msg_status_from_code(code);
+    error = msg_error_from_code(code);
     return deserializer;
 }
 
@@ -203,21 +205,22 @@ std::string MessageTag::to_string() const
     ;
 }
 
-MessageHeader MessageHeader::gen_request()
+
+MessageHeader::MessageHeader() : seqn(0), timestamp(0)
 {
-    static std::atomic<uint64_t> current_seqn = 0;
-    MessageHeader header;
-    header.seqn = current_seqn.fetch_add(1);
-    header.timestamp = time(NULL);
-    return header;
 }
 
-MessageHeader MessageHeader::gen_response(uint64_t seqn)
+void MessageHeader::fill_req()
 {
-    MessageHeader header;
-    header.seqn = seqn;
-    header.timestamp = time(NULL);
-    return header;
+    static std::atomic<uint64_t> current_seqn = 0;
+    this->seqn = current_seqn.fetch_add(1);
+    this->timestamp = time(NULL);
+}
+
+void MessageHeader::fill_resp(uint64_t seqn)
+{
+    this->seqn = seqn;
+    this->timestamp = time(NULL);
 }
 
 void MessageHeader::serialize(Serializer& serializer) const
@@ -228,6 +231,23 @@ void MessageHeader::serialize(Serializer& serializer) const
 void MessageHeader::deserialize(Deserializer& deserializer)
 {
     deserializer >> this->seqn >> this->timestamp;
+}
+
+CastOnMessageError::CastOnMessageError(MessageError error) :
+    error_(error),
+    message("expected message to not be an error, but it is, code = ")
+{
+    this->message += std::to_string(error);
+}
+
+MessageError const& CastOnMessageError::error() const
+{
+    return this->error_;
+}
+
+const char *CastOnMessageError::what() const noexcept
+{
+    return this->message.c_str();
 }
 
 MessageBody::~MessageBody()
@@ -257,14 +277,6 @@ void MessageConnectReq::deserialize(Deserializer& deserializer)
     deserializer >> this->username;
 }
 
-MessageConnectResp::MessageConnectResp() : MessageConnectResp(MSG_OK)
-{
-}
-
-MessageConnectResp::MessageConnectResp(MessageStatus status) : status(status)
-{
-}
-
 MessageTag MessageConnectResp::tag() const
 {
     return MessageTag(MSG_RESP, MSG_CONNECT);
@@ -272,14 +284,35 @@ MessageTag MessageConnectResp::tag() const
 
 void MessageConnectResp::serialize(Serializer& serializer) const
 {
-    serializer << (uint64_t) this->status;
 }
 
 void MessageConnectResp::deserialize(Deserializer& deserializer)
 {
+}
+
+MessageErrorResp::MessageErrorResp() : MessageErrorResp(MSG_INTERNAL_ERR)
+{
+}
+
+MessageErrorResp::MessageErrorResp(MessageError error) : error(error)
+{
+}
+
+MessageTag MessageErrorResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_ERROR);
+}
+
+void MessageErrorResp::serialize(Serializer& serializer) const
+{
+    serializer << (uint64_t) this->error;
+}
+
+void MessageErrorResp::deserialize(Deserializer& deserializer)
+{
     uint64_t code;
     deserializer >> code;
-    this->status = msg_status_from_code(code);
+    this->error = msg_error_from_code(code);
 }
 
 MessageTag MessageDisconnectReq::tag() const
