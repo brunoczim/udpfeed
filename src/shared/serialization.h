@@ -30,6 +30,11 @@ class DeserializationError : public std::exception {
         virtual const char *what() const noexcept;
 };
 
+class DeserializationUnexpectedEof : public DeserializationError {
+    public:
+        DeserializationUnexpectedEof();
+};
+
 class DeserializationExpectedEof : public DeserializationError {
     public:
         DeserializationExpectedEof();

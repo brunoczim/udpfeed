@@ -10,6 +10,11 @@
 #include <sstream>
 #include <chrono>
 
+const char *SocketHasShutdown::what() const noexcept
+{
+    return "socket has shutdown";
+}
+
 SocketIoError::SocketIoError(std::string const& message) :
     c_errno_(errno),
     message(message),
@@ -103,6 +108,9 @@ Enveloped Socket::receive()
     if (count < 0) {
         throw SocketIoError("socket recv");
     }
+    if (count == 0) {
+        throw SocketHasShutdown();
+    }
     if (sender_len != sizeof(sender_addr)) {
         throw InvalidAddrLen(
             "Socket address unexpectedly has the wrong length"
@@ -128,6 +136,7 @@ std::optional<Enveloped> Socket::receive(int timeout_ms)
     struct pollfd fds[1];
     fds[0].fd = this->sockfd;
     fds[0].events = POLLIN;
+    fds[0].revents = 0;
 
     int status = poll(fds, sizeof(fds) / sizeof(fds[0]), timeout_ms);
     if (status < 0) {
@@ -356,10 +365,10 @@ void ReliableSocket::Inner::unsafe_send_resp(Enveloped enveloped)
     this->udp.send(enveloped);
 }
 
-std::optional<Enveloped> ReliableSocket::Inner::receive_raw(int max_poll_wait_ms)
+std::optional<Enveloped> ReliableSocket::Inner::receive_raw(int poll_timeout_ms)
 {
     while (this->is_connected()) {
-        if (auto enveloped = this->udp.receive(max_poll_wait_ms)) {
+        if (auto enveloped = this->udp.receive(poll_timeout_ms)) {
             return std::optional<Enveloped>(enveloped);
         }
     }
@@ -465,7 +474,7 @@ void ReliableSocket::Inner::unsafe_handle_resp(Enveloped enveloped)
         if (auto pending_node = connection.pending_responses.extract(
             enveloped.message.header.seqn
         )) {
-            PendingResponse pending = std::move(pending_node.mapped());
+            PendingResponse pending = pending_node.mapped();
             pending.callback.send(enveloped);
         } else {
             throw ReceivedUnknownResp(enveloped);
@@ -516,18 +525,16 @@ void ReliableSocket::Inner::bump()
     }
 }
 
-void ReliableSocket::Inner::disconnect() &&
+void ReliableSocket::Inner::disconnect()
 {
-    {
-        auto closed_ = std::move(this->handler_to_req_receiver);
-    }
+    auto closed_ = std::move(this->handler_to_req_receiver);
 }
 
 ReliableSocket::Config::Config() :
     max_req_attempts(10),
     max_cached_sent_resps(25),
     bump_interval_nanos(500 * 100),
-    max_poll_wait_ms(10)
+    poll_timeout_ms(10)
 {
 }
 
@@ -555,9 +562,9 @@ ReliableSocket::Config& ReliableSocket::Config::with_bump_interval_nanos(
     return *this;
 }
 
-ReliableSocket::Config& ReliableSocket::Config::with_max_poll_wait_ms(int val)
+ReliableSocket::Config& ReliableSocket::Config::with_poll_timeout_ms(int val)
 {
-    this->max_poll_wait_ms = val;
+    this->poll_timeout_ms = val;
     return *this;
 }
 
@@ -596,7 +603,7 @@ void ReliableSocket::ReceivedReq::send_resp(Message response) &&
 ReliableSocket::ReliableSocket(
     std::shared_ptr<ReliableSocket::Inner> inner,
     uint64_t bump_interval_nanos,
-    int max_poll_wait_ms,
+    int poll_timeout_ms,
     Channel<Enveloped>&& input_to_handler_channel,
     Channel<Enveloped>::Sender&& handler_to_req_receiver
 ) :
@@ -604,16 +611,15 @@ ReliableSocket::ReliableSocket(
 
     input_thread([
         inner,
-        max_poll_wait_ms,
+        poll_timeout_ms,
         channel = std::move(input_to_handler_channel.sender)
     ] () mutable {
         try {
-            while (auto enveloped = inner->receive_raw(max_poll_wait_ms)) {
+            while (auto enveloped = inner->receive_raw(poll_timeout_ms)) {
                 channel.send(*enveloped);
             }
         } catch (ChannelDisconnected const& exc) {
         }
-        std::cerr << "aaa" << std::endl;
     }),
 
     handler_thread([
@@ -630,7 +636,6 @@ ReliableSocket::ReliableSocket(
             }
         } catch (ChannelDisconnected const& exc) {
         }
-        std::cerr << "bbb" << std::endl;
     }),
 
     bumper_thread([inner, bump_interval_nanos] () mutable {
@@ -639,7 +644,6 @@ ReliableSocket::ReliableSocket(
             std::this_thread::sleep_for(interval);
             inner->bump();
         }
-        std::cerr << "ccc" << std::endl;
     })
 {
 }
@@ -658,7 +662,7 @@ ReliableSocket::ReliableSocket(
             std::move(handler_to_recv_req_channel.receiver)
         )),
         config.bump_interval_nanos,
-        config.max_poll_wait_ms,
+        config.poll_timeout_ms,
         std::move(input_to_handler_channel),
         std::move(handler_to_recv_req_channel.sender)
     )
@@ -680,9 +684,7 @@ ReliableSocket::ReliableSocket(
 
 ReliableSocket::~ReliableSocket()
 {
-    {
-        std::move(*this->inner).disconnect();
-    }
+    this->inner->disconnect();
     this->input_thread.join();
     this->handler_thread.join();
     this->bumper_thread.join();

@@ -3,6 +3,11 @@
 #include <ctime>
 #include <atomic>
 
+const char *MessageOutOfProtocol::what() const noexcept
+{
+    return "message does not have the magic number thus not recognized";
+}
+
 InvalidMessagePayload::InvalidMessagePayload(std::string const& error_message) :
     error_message(error_message)
 {
@@ -344,6 +349,7 @@ void MessageDisconnectResp::deserialize(Deserializer& deserializer)
 void Message::serialize(Serializer& serializer) const
 {
     serializer
+        << MSG_MAGIC_NUMBER
         << this->header
         << this->body->tag()
         << *this->body;
@@ -351,6 +357,15 @@ void Message::serialize(Serializer& serializer) const
 
 void Message::deserialize(Deserializer& deserializer)
 {
+    try {
+        uint64_t maybe_magic_number;
+        deserializer >> maybe_magic_number;
+        if (maybe_magic_number != MSG_MAGIC_NUMBER) {
+            throw MessageOutOfProtocol();
+        }
+    } catch (DeserializationUnexpectedEof const& exc) {
+        throw MessageOutOfProtocol();
+    }
     MessageTag tag;
     deserializer >> this->header >> tag;
     this->body.reset();

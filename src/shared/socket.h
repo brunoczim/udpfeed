@@ -12,6 +12,11 @@
 #include "address.h"
 #include "channel.h"
 
+class SocketHasShutdown : public std::exception {
+    public:
+        virtual const char *what() const noexcept;
+};
+
 class SocketError : public std::exception {};
 
 class SocketIoError : public SocketError {
@@ -185,7 +190,7 @@ class ReliableSocket {
 
                 void unsafe_send_resp(Enveloped enveloped);
 
-                std::optional<Enveloped> receive_raw(int max_poll_wait_ms);
+                std::optional<Enveloped> receive_raw(int poll_timeout_ms);
 
                 Enveloped receive();
 
@@ -197,7 +202,7 @@ class ReliableSocket {
 
                 void bump();
 
-                void disconnect() &&;
+                void disconnect();
         };
 
     public:
@@ -206,14 +211,14 @@ class ReliableSocket {
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
                 uint64_t bump_interval_nanos;
-                int max_poll_wait_ms;
+                int poll_timeout_ms;
 
                 Config();
 
                 Config& with_max_req_attempts(uint64_t val);
                 Config& with_max_cached_sent_resps(uint64_t val);
                 Config& with_bump_interval_nanos(uint64_t val);
-                Config& with_max_poll_wait_ms(int val);
+                Config& with_poll_timeout_ms(int val);
         };
 
         class SentReq {
@@ -253,7 +258,7 @@ class ReliableSocket {
         ReliableSocket(
             std::shared_ptr<ReliableSocket::Inner> inner,
             uint64_t bump_interval_nanos,
-            int max_poll_wait_ms,
+            int poll_timeout_ms,
             Channel<Enveloped>&& input_to_handler_channel,
             Channel<Enveloped>::Sender&& handler_to_req_receiver
         );

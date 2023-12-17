@@ -646,7 +646,6 @@ static TestSuite reliable_socket_test_suite()
             Socket client_udp(500);
             ReliableSocket client(std::move(client_udp));
 
-            /*
             Socket server_udp(500, 8082);
             ReliableSocket server(std::move(server_udp));
 
@@ -656,6 +655,10 @@ static TestSuite reliable_socket_test_suite()
                 new MessageConnectReq("bruno")
             );
             ReliableSocket::SentReq sent_conn_req = client.send_req(conn_req);
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+            /*
             ReliableSocket::ReceivedReq recvd_conn_req = server.receive_req();
 
             TEST_ASSERT(
