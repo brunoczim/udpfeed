@@ -80,6 +80,7 @@ MessageType msg_type_from_code(uint16_t code)
 {
     switch (code) {
         case MSG_CONNECT: return MSG_CONNECT;
+        case MSG_ERROR: return MSG_ERROR;
         case MSG_DISCONNECT: return MSG_DISCONNECT;
         default: throw InvalidMessageType(code);
     }
@@ -202,11 +203,11 @@ void MessageTag::deserialize(Deserializer& deserializer)
 
 std::string MessageTag::to_string() const
 {
-    return std::string("MessageTag { .step = ")
+    return std::string("MessageTag { step = ")
         + std::to_string(this->step)
-        + ", .type = "
+        + ", type = "
         + std::to_string(this->type)
-        + "}"
+        + " }"
     ;
 }
 

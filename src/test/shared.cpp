@@ -747,7 +747,6 @@ static TestSuite reliable_socket_test_suite()
             );
             ReliableSocket::SentReq sent_conn_req = client.send_req(conn_req);
 
-
             Enveloped recvd_conn_resp = std::move(sent_conn_req).receive_resp();
             TEST_ASSERT(
                 "found " + recvd_conn_resp.message.body->tag().to_string(),

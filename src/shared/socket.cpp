@@ -341,8 +341,6 @@ void ReliableSocket::Inner::unsafe_send_resp(Enveloped enveloped)
 {
     Connection& connection = this->connections[enveloped.remote];
 
-    enveloped.message.header.fill_resp(enveloped.message.header.seqn);
-
     if (
         connection.cached_sent_resp_queue.size()
         < connection.max_cached_sent_resps
@@ -415,7 +413,9 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
             case MSG_DISCONNECT: {
                 Enveloped response;
                 response.remote = enveloped.remote;
-                response.message.header = enveloped.message.header;
+                response.message.header.fill_resp(
+                    enveloped.message.header.seqn
+                );
                 response.message.body = std::shared_ptr<MessageBody>(
                     new MessageDisconnectResp
                 );
@@ -426,7 +426,9 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
             default: {
                 Enveloped response;
                 response.remote = enveloped.remote;
-                response.message.header = enveloped.message.header;
+                response.message.header.fill_resp(
+                    enveloped.message.header.seqn
+                );
                 response.message.body = std::shared_ptr<MessageBody>(
                     new MessageErrorResp(MSG_NO_CONNECTION)
                 );
@@ -446,17 +448,9 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
         Enveloped response = std::get<1>(*resp_search);
         this->udp.send(response);
     } else if (
-        connection.min_accepted_req_seqn > enveloped.message.header.seqn
+        connection.min_accepted_req_seqn <= enveloped.message.header.seqn
     ) {
-        Enveloped response;
-        response.remote = enveloped.remote;
-        response.message.header = enveloped.message.header;
-        response.message.body = std::shared_ptr<MessageBody>(
-            new MessageErrorResp(MSG_OUTDATED_SEQN)
-        );
-        this->udp.send(response);
-    } else {
-        connection.min_accepted_req_seqn = enveloped.message.header.seqn;
+        connection.min_accepted_req_seqn = enveloped.message.header.seqn + 1;
         return std::make_optional(enveloped);
     }
 
@@ -475,11 +469,7 @@ void ReliableSocket::Inner::unsafe_handle_resp(Enveloped enveloped)
         )) {
             PendingResponse pending = pending_node.mapped();
             pending.callback.send(enveloped);
-        } else {
-            throw ReceivedUnknownResp(enveloped);
         }
-    } else {
-        throw ReceivedUnknownResp(enveloped);
     }
     if (enveloped.message.body->tag().type == MSG_DISCONNECT) {
         this->connections.erase(enveloped.remote);
@@ -539,9 +529,9 @@ void ReliableSocket::Inner::disconnect()
 }
 
 ReliableSocket::Config::Config() :
-    max_req_attempts(48),
+    max_req_attempts(50),
     max_cached_sent_resps(100),
-    bump_interval_nanos(1000 * 1000),
+    bump_interval_nanos(10 * 1000),
     poll_timeout_ms(10)
 {
 }
@@ -606,7 +596,9 @@ void ReliableSocket::ReceivedReq::send_resp(
 {
     Enveloped envloped_resp;
     envloped_resp.remote = this->req_enveloped_.remote;
-    envloped_resp.message.header = this->req_enveloped_.message.header;
+    envloped_resp.message.header.fill_resp(
+        this->req_enveloped_.message.header.seqn
+    );
     envloped_resp.message.body = response;
     this->inner->send_resp(envloped_resp);
 }
