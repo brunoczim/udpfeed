@@ -3,6 +3,11 @@
 #include <ctime>
 #include <atomic>
 
+const char *MessageOutOfProtocol::what() const noexcept
+{
+    return "message does not have the magic number thus not recognized";
+}
+
 InvalidMessagePayload::InvalidMessagePayload(std::string const& error_message) :
     error_message(error_message)
 {
@@ -75,6 +80,7 @@ MessageType msg_type_from_code(uint16_t code)
 {
     switch (code) {
         case MSG_CONNECT: return MSG_CONNECT;
+        case MSG_ERROR: return MSG_ERROR;
         case MSG_DISCONNECT: return MSG_DISCONNECT;
         default: throw InvalidMessageType(code);
     }
@@ -197,11 +203,11 @@ void MessageTag::deserialize(Deserializer& deserializer)
 
 std::string MessageTag::to_string() const
 {
-    return std::string("MessageTag { .step = ")
+    return std::string("MessageTag { step = ")
         + std::to_string(this->step)
-        + ", .type = "
+        + ", type = "
         + std::to_string(this->type)
-        + "}"
+        + " }"
     ;
 }
 
@@ -344,6 +350,7 @@ void MessageDisconnectResp::deserialize(Deserializer& deserializer)
 void Message::serialize(Serializer& serializer) const
 {
     serializer
+        << MSG_MAGIC_NUMBER
         << this->header
         << this->body->tag()
         << *this->body;
@@ -351,6 +358,15 @@ void Message::serialize(Serializer& serializer) const
 
 void Message::deserialize(Deserializer& deserializer)
 {
+    try {
+        uint64_t maybe_magic_number;
+        deserializer >> maybe_magic_number;
+        if (maybe_magic_number != MSG_MAGIC_NUMBER) {
+            throw MessageOutOfProtocol();
+        }
+    } catch (DeserializationUnexpectedEof const& exc) {
+        throw MessageOutOfProtocol();
+    }
     MessageTag tag;
     deserializer >> this->header >> tag;
     this->body.reset();
@@ -372,6 +388,10 @@ void Message::deserialize(Deserializer& deserializer)
                 case MSG_CONNECT:
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageConnectResp);
+                    break;
+                case MSG_ERROR:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageErrorResp);
                     break;
                 case MSG_DISCONNECT:
                     this->body =

@@ -21,6 +21,13 @@ const char *DeserializationError::what() const noexcept
     return message.c_str();
 }
 
+DeserializationUnexpectedEof::DeserializationUnexpectedEof() :
+    DeserializationError(
+        "unexpected end of input during deserialization"
+    )
+{
+}
+
 DeserializationExpectedEof::DeserializationExpectedEof() : DeserializationError(
     "expected end of input during deserialization but got more data"
 )
@@ -307,7 +314,7 @@ Deserializer& PlaintextDeserializer::operator>>(std::string& data)
         data.push_back(byte);
     }
     if (byte == EOF) {
-        throw DeserializationError("unexpected end of input");
+        throw DeserializationUnexpectedEof();
     }
     return *this;
 }

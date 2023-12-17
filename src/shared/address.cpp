@@ -110,18 +110,18 @@ bool Address::operator>=(Address const& other) const
 
 std::string Address::to_string() const
 {
-    uint32_t ipv4 = htonl(this->ipv4);
-    uint16_t port = htons(this->port);
+    uint32_t ipv4 = this->ipv4;
+    uint16_t port = this->port;
     std::stringstream sstream;
 
     for (size_t i = 0; i < 4; i++) {
-        sstream << (ipv4 & 0xff);
+        sstream << (ipv4 >> 24);
         if (i < 3) {
             sstream << ".";
         } else {
             sstream << ":";
         }
-        ipv4 >>= 8;
+        ipv4 <<= 8;
     }
     sstream << port;
     return sstream.str();

@@ -8,6 +8,13 @@
 #include <string>
 #include <memory>
 
+constexpr uint64_t MSG_MAGIC_NUMBER = 8969265839344830156;
+
+class MessageOutOfProtocol : public std::exception {
+    public:
+        virtual const char *what() const noexcept;
+};
+
 class InvalidMessagePayload: public std::exception {
     private:
         std::string error_message;

@@ -67,18 +67,21 @@ Socket::Socket(size_t max_message_size, uint16_t port) :
     }
 }
 
-Socket::Socket(Socket&& other) : sockfd(other.sockfd)
+Socket::Socket(Socket&& other) :
+    sockfd(other.sockfd),
+    max_message_size(other.max_message_size)
 {
     other.sockfd = -1;
 }
 
-Socket& Socket::operator=(Socket&& obj)
+Socket& Socket::operator=(Socket&& other)
 {
-    if (this->sockfd != obj.sockfd) {
+    if (this->sockfd != other.sockfd) {
         this->close();
     }
-    this->sockfd = obj.sockfd;
-    obj.sockfd = -1;
+    this->max_message_size = other.max_message_size;
+    this->sockfd = other.sockfd;
+    other.sockfd = -1;
     return *this;
 }
 
@@ -128,6 +131,7 @@ std::optional<Enveloped> Socket::receive(int timeout_ms)
     struct pollfd fds[1];
     fds[0].fd = this->sockfd;
     fds[0].events = POLLIN;
+    fds[0].revents = 0;
 
     int status = poll(fds, sizeof(fds) / sizeof(fds[0]), timeout_ms);
     if (status < 0) {
@@ -146,7 +150,7 @@ void Socket::send(Enveloped const& enveloped)
     Serializer& serializer = serializer_impl;
     serializer << enveloped.message;
     std::string buf = ostream.str();
-    
+
     struct sockaddr_in receiver_addr_in;
 
     receiver_addr_in.sin_family = AF_INET;
@@ -171,7 +175,6 @@ void Socket::send(Enveloped const& enveloped)
 void Socket::close()
 {
     if (this->sockfd >= 0) {
-        shutdown(this->sockfd, SHUT_RDWR);
         ::close(this->sockfd);
     }
 }
@@ -247,6 +250,8 @@ ReliableSocket::PendingResponse::PendingResponse(
     Channel<Enveloped>::Sender&& callback
 ) :
     request(enveloped),
+    cooldown_exp(1),
+    cooldown_counter(1),
     remaining_attempts(max_req_attempts),
     callback(callback)
 {
@@ -283,7 +288,11 @@ ReliableSocket::Inner::Inner(
 
 bool ReliableSocket::Inner::is_connected()
 {
-    return this->handler_to_req_receiver.is_connected();
+    try {
+        return this->handler_to_req_receiver.is_connected();
+    } catch (ChannelDisconnected const& exc) {
+        return false;
+    }
 }
 
 void ReliableSocket::Inner::send_req(
@@ -332,8 +341,6 @@ void ReliableSocket::Inner::unsafe_send_resp(Enveloped enveloped)
 {
     Connection& connection = this->connections[enveloped.remote];
 
-    enveloped.message.header.fill_resp(enveloped.message.header.seqn);
-
     if (
         connection.cached_sent_resp_queue.size()
         < connection.max_cached_sent_resps
@@ -352,9 +359,17 @@ void ReliableSocket::Inner::unsafe_send_resp(Enveloped enveloped)
     this->udp.send(enveloped);
 }
 
-Enveloped ReliableSocket::Inner::receive_raw()
+std::optional<Enveloped> ReliableSocket::Inner::receive_raw(int poll_timeout_ms)
 {
-    return this->udp.receive();
+    while (this->is_connected()) {
+        try {
+            if (auto enveloped = this->udp.receive(poll_timeout_ms)) {
+                return std::optional<Enveloped>(enveloped);
+            }
+        } catch (MessageOutOfProtocol const &exc) {
+        }
+    }
+    return std::optional<Enveloped>();
 }
 
 Enveloped ReliableSocket::Inner::receive()
@@ -398,7 +413,9 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
             case MSG_DISCONNECT: {
                 Enveloped response;
                 response.remote = enveloped.remote;
-                response.message.header = enveloped.message.header;
+                response.message.header.fill_resp(
+                    enveloped.message.header.seqn
+                );
                 response.message.body = std::shared_ptr<MessageBody>(
                     new MessageDisconnectResp
                 );
@@ -409,7 +426,9 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
             default: {
                 Enveloped response;
                 response.remote = enveloped.remote;
-                response.message.header = enveloped.message.header;
+                response.message.header.fill_resp(
+                    enveloped.message.header.seqn
+                );
                 response.message.body = std::shared_ptr<MessageBody>(
                     new MessageErrorResp(MSG_NO_CONNECTION)
                 );
@@ -429,17 +448,9 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
         Enveloped response = std::get<1>(*resp_search);
         this->udp.send(response);
     } else if (
-        connection.min_accepted_req_seqn > enveloped.message.header.seqn
+        connection.min_accepted_req_seqn <= enveloped.message.header.seqn
     ) {
-        Enveloped response;
-        response.remote = enveloped.remote;
-        response.message.header = enveloped.message.header;
-        response.message.body = std::shared_ptr<MessageBody>(
-            new MessageErrorResp(MSG_OUTDATED_SEQN)
-        );
-        this->udp.send(response);
-    } else {
-        connection.min_accepted_req_seqn = enveloped.message.header.seqn;
+        connection.min_accepted_req_seqn = enveloped.message.header.seqn + 1;
         return std::make_optional(enveloped);
     }
 
@@ -456,13 +467,9 @@ void ReliableSocket::Inner::unsafe_handle_resp(Enveloped enveloped)
         if (auto pending_node = connection.pending_responses.extract(
             enveloped.message.header.seqn
         )) {
-            PendingResponse pending = std::move(pending_node.mapped());
+            PendingResponse pending = pending_node.mapped();
             pending.callback.send(enveloped);
-        } else {
-            throw ReceivedUnknownResp(enveloped);
         }
-    } else {
-        throw ReceivedUnknownResp(enveloped);
     }
     if (enveloped.message.body->tag().type == MSG_DISCONNECT) {
         this->connections.erase(enveloped.remote);
@@ -483,17 +490,26 @@ void ReliableSocket::Inner::bump()
             uint64_t seqn = std::get<0>(pending_entry);
             PendingResponse& pending = std::get<1>(pending_entry);
 
-            if (pending.remaining_attempts == 0) {
-                seqn_to_be_removed.insert(seqn);
+            if (pending.cooldown_counter == 0) {
                 if (
-                    pending.request.message.body->tag().type == MSG_DISCONNECT
-                    || pending.request.message.body->tag().type == MSG_CONNECT
+                    pending.remaining_attempts == 0
+                    || pending.cooldown_exp == 0
                 ) {
-                    addresses_to_be_removed.insert(address);
+                    seqn_to_be_removed.insert(seqn);
+                    switch (pending.request.message.body->tag().type) {
+                        case MSG_DISCONNECT:
+                        case MSG_CONNECT:
+                            addresses_to_be_removed.insert(address);
+                            break;
+                    }
+                } else {
+                    pending.remaining_attempts--;
+                    this->udp.send(pending.request);
                 }
+                pending.cooldown_counter = 1 << pending.cooldown_exp;
+                pending.cooldown_exp++;
             } else {
-                pending.remaining_attempts--;
-                this->udp.send(pending.request);
+                pending.cooldown_counter--;
             }
         }
         for (uint64_t const& seqn : seqn_to_be_removed) {
@@ -507,10 +523,16 @@ void ReliableSocket::Inner::bump()
     }
 }
 
+void ReliableSocket::Inner::disconnect()
+{
+    auto closed_ = std::move(this->handler_to_req_receiver);
+}
+
 ReliableSocket::Config::Config() :
-    max_req_attempts(10),
-    max_cached_sent_resps(25),
-    bump_interval_nanos(500 * 100)
+    max_req_attempts(50),
+    max_cached_sent_resps(100),
+    bump_interval_nanos(10 * 1000),
+    poll_timeout_ms(10)
 {
 }
 
@@ -538,6 +560,12 @@ ReliableSocket::Config& ReliableSocket::Config::with_bump_interval_nanos(
     return *this;
 }
 
+ReliableSocket::Config& ReliableSocket::Config::with_poll_timeout_ms(int val)
+{
+    this->poll_timeout_ms = val;
+    return *this;
+}
+
 ReliableSocket::SentReq::SentReq(Channel<Enveloped>::Receiver&& channel) :
     channel(channel)
 {
@@ -562,17 +590,23 @@ Enveloped const& ReliableSocket::ReceivedReq::req_enveloped() const
     return this->req_enveloped_;
 }
 
-void ReliableSocket::ReceivedReq::send_resp(Message response) &&
+void ReliableSocket::ReceivedReq::send_resp(
+    std::shared_ptr<MessageBody> const& response
+) &&
 {
     Enveloped envloped_resp;
     envloped_resp.remote = this->req_enveloped_.remote;
-    envloped_resp.message = response;
+    envloped_resp.message.header.fill_resp(
+        this->req_enveloped_.message.header.seqn
+    );
+    envloped_resp.message.body = response;
     this->inner->send_resp(envloped_resp);
 }
 
 ReliableSocket::ReliableSocket(
     std::shared_ptr<ReliableSocket::Inner> inner,
     uint64_t bump_interval_nanos,
+    int poll_timeout_ms,
     Channel<Enveloped>&& input_to_handler_channel,
     Channel<Enveloped>::Sender&& handler_to_req_receiver
 ) :
@@ -580,14 +614,14 @@ ReliableSocket::ReliableSocket(
 
     input_thread([
         inner,
+        poll_timeout_ms,
         channel = std::move(input_to_handler_channel.sender)
     ] () mutable {
         try {
-            for (;;) {
-                Enveloped enveloped = inner->receive();
-                channel.send(enveloped);
+            while (auto enveloped = inner->receive_raw(poll_timeout_ms)) {
+                channel.send(*enveloped);
             }
-        } catch (ReceiversDisconnected const& exc) {
+        } catch (ChannelDisconnected const& exc) {
         }
     }),
 
@@ -631,6 +665,7 @@ ReliableSocket::ReliableSocket(
             std::move(handler_to_recv_req_channel.receiver)
         )),
         config.bump_interval_nanos,
+        config.poll_timeout_ms,
         std::move(input_to_handler_channel),
         std::move(handler_to_recv_req_channel.sender)
     )
@@ -650,14 +685,38 @@ ReliableSocket::ReliableSocket(
 {
 }
 
+ReliableSocket::ReliableSocket(ReliableSocket&& other) :
+    inner(std::move(other.inner)),
+    input_thread(std::move(other.input_thread)),
+    handler_thread(std::move(other.handler_thread)),
+    bumper_thread(std::move(other.bumper_thread))
+{
+}
+
+ReliableSocket& ReliableSocket::operator=(ReliableSocket&& other)
+{
+    this->close();
+    this->inner = std::move(other.inner);
+    this->input_thread = std::move(other.input_thread);
+    this->handler_thread = std::move(other.handler_thread);
+    this->bumper_thread = std::move(other.bumper_thread);
+
+    return *this;
+}
+
 ReliableSocket::~ReliableSocket()
 {
-    {
-        auto closed_ = std::move(this->inner);
+    this->close();
+}
+
+void ReliableSocket::close()
+{
+    if (this->inner) {
+        this->inner->disconnect();
+        this->input_thread.join();
+        this->handler_thread.join();
+        this->bumper_thread.join();
     }
-    this->input_thread.join();
-    this->handler_thread.join();
-    this->bumper_thread.join();
 }
 
 ReliableSocket::SentReq ReliableSocket::send_req(Enveloped enveloped)

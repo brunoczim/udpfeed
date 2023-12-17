@@ -23,7 +23,7 @@ class ReceiversDisconnected : public ChannelDisconnected {
         virtual char const *what() const noexcept;
 };
 
-class UsageOfMovedChannel : public std::exception {
+class UsageOfMovedChannel : public ChannelDisconnected {
     public:
         virtual char const *what() const noexcept;
 };

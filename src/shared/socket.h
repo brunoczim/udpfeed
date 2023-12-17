@@ -44,7 +44,7 @@ class Socket {
         Socket(size_t max_message_size);
         Socket(size_t max_message_size, uint16_t port);
         Socket(Socket&& other);
-        Socket(Socket const& obj) = delete;
+        Socket(Socket const& other) = delete;
         Socket& operator=(Socket const& obj) = delete;
         Socket& operator=(Socket&& obj);
 
@@ -127,6 +127,8 @@ class ReliableSocket {
         class PendingResponse {
             public:
                 Enveloped request;
+                uint8_t cooldown_exp;
+                uint64_t cooldown_counter;
                 uint64_t remaining_attempts;
                 Channel<Enveloped>::Sender callback;
 
@@ -185,7 +187,7 @@ class ReliableSocket {
 
                 void unsafe_send_resp(Enveloped enveloped);
 
-                Enveloped receive_raw();
+                std::optional<Enveloped> receive_raw(int poll_timeout_ms);
 
                 Enveloped receive();
 
@@ -196,6 +198,8 @@ class ReliableSocket {
                 void unsafe_handle_resp(Enveloped enveloped);
 
                 void bump();
+
+                void disconnect();
         };
 
     public:
@@ -204,12 +208,14 @@ class ReliableSocket {
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
                 uint64_t bump_interval_nanos;
+                int poll_timeout_ms;
 
                 Config();
 
                 Config& with_max_req_attempts(uint64_t val);
                 Config& with_max_cached_sent_resps(uint64_t val);
                 Config& with_bump_interval_nanos(uint64_t val);
+                Config& with_poll_timeout_ms(int val);
         };
 
         class SentReq {
@@ -237,7 +243,7 @@ class ReliableSocket {
             public:
                 Enveloped const& req_enveloped() const;
 
-                void send_resp(Message response) &&;
+                void send_resp(std::shared_ptr<MessageBody> const& response) &&;
         };
 
     private:
@@ -249,6 +255,7 @@ class ReliableSocket {
         ReliableSocket(
             std::shared_ptr<ReliableSocket::Inner> inner,
             uint64_t bump_interval_nanos,
+            int poll_timeout_ms,
             Channel<Enveloped>&& input_to_handler_channel,
             Channel<Enveloped>::Sender&& handler_to_req_receiver
         );
@@ -260,16 +267,22 @@ class ReliableSocket {
             Channel<Enveloped>&& handler_to_recv_req_channel
         );
 
+    private:
+        void close();
+
     public:
         ReliableSocket(
             Socket&& udp,
             Config config = Config()
         );
 
-        SentReq send_req(Enveloped message);
-        ReceivedReq receive_req();
+        ReliableSocket(ReliableSocket&& other);
+        ReliableSocket& operator=(ReliableSocket&& other);
 
         ~ReliableSocket();
+
+        SentReq send_req(Enveloped message);
+        ReceivedReq receive_req();
 };
 
 #endif
