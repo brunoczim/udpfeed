@@ -2,6 +2,7 @@
 #define SHARED_MESSAGE_H_ 1
 
 #include "serialization.h"
+#include "address.h"
 
 #include <cstdint>
 #include <string>
@@ -16,28 +17,30 @@ class InvalidMessagePayload: public std::exception {
         virtual const char *what() const noexcept;
 };
 
-enum MessageStatus {
-    MSG_OK,
+enum MessageError {
+    MSG_INTERNAL_ERR,
+    MSG_NO_CONNECTION,
+    MSG_OUTDATED_SEQN,
     MSG_BAD_USERNAME,
     MSG_TOO_MANY_SESSIONS
 };
 
-class InvalidMessageStatus : public std::exception {
+class InvalidMessageError : public std::exception {
     private:
         std::string message;
         uint16_t code_;
     public:
-        InvalidMessageStatus(uint16_t code);
+        InvalidMessageError(uint16_t code);
 
         uint16_t code() const;
 
         virtual const char *what() const noexcept;
 };
 
-MessageStatus msg_status_from_code(uint16_t code);
+MessageError msg_status_from_code(uint16_t code);
 
-Serializer& operator<<(Serializer& serializer, MessageStatus status);
-Deserializer& operator>>(Deserializer& deserializer, MessageStatus& status);
+Serializer& operator<<(Serializer& serializer, MessageError status);
+Deserializer& operator>>(Deserializer& deserializer, MessageError& status);
 
 enum MessageStep {
     MSG_REQ,
@@ -63,6 +66,7 @@ Deserializer& operator>>(Deserializer& deserializer, MessageStep &step);
 
 enum MessageType {
     MSG_CONNECT,
+    MSG_ERROR,
     MSG_DISCONNECT
 };
 
@@ -78,7 +82,7 @@ class InvalidMessageType : public std::exception {
         virtual const char *what() const noexcept;
 };
 
-MessageType msg_tag_from_code(uint16_t code);
+MessageType msg_type_from_code(uint16_t code);
 
 Serializer& operator<<(Serializer& serializer, MessageType tag);
 Deserializer& operator>>(Deserializer& deserializer, MessageType &tag);
@@ -110,16 +114,35 @@ class MessageHeader : public Serializable, public Deserializable {
         uint64_t seqn;
         uint64_t timestamp;
 
-        static MessageHeader gen_request();
-        static MessageHeader gen_response(uint64_t seqn);
+        MessageHeader();
+
+        void fill_req();
+        void fill_resp(uint64_t seqn);
 
         virtual void serialize(Serializer& serializer) const;
         virtual void deserialize(Deserializer& deserializer);
 };
 
+class CastOnMessageError : public std::exception {
+    private:
+        MessageError error_;
+        std::string message;
+    public:
+        CastOnMessageError(MessageError error);
+        MessageError const& error() const;
+        virtual const char *what() const noexcept;
+};
+
 class MessageBody : public Serializable, public Deserializable {
     public:
         virtual MessageTag tag() const = 0;
+
+        template <typename T>
+        T& cast();
+
+        template <typename T>
+        T const& cast() const;
+
         virtual ~MessageBody();
 };
 
@@ -138,10 +161,18 @@ class MessageConnectReq : public MessageBody {
 
 class MessageConnectResp : public MessageBody {
     public:
-        MessageStatus status;
+        virtual MessageTag tag() const;
 
-        MessageConnectResp();
-        MessageConnectResp(MessageStatus status);
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageErrorResp : public MessageBody {
+    public:
+        MessageError error;
+
+        MessageErrorResp();
+        MessageErrorResp(MessageError error);
 
         virtual MessageTag tag() const;
 
@@ -173,5 +204,38 @@ class Message : public Serializable, public Deserializable {
         virtual void serialize(Serializer& serializer) const;
         virtual void deserialize(Deserializer& deserializer);
 };
+
+class Enveloped {
+    public:
+        Enveloped();
+        Enveloped(Address remote, Message message);
+
+        Address remote;
+        Message message;
+};
+
+template <typename T>
+T& MessageBody::cast()
+{
+    try {
+        return dynamic_cast<T&>(*this);
+    } catch (std::bad_cast const& exception) {
+        throw CastOnMessageError(
+            dynamic_cast<MessageErrorResp const&>(*this).error
+        );
+    }
+}
+
+template <typename T>
+T const& MessageBody::cast() const
+{
+    try {
+        return dynamic_cast<T const&>(*this);
+    } catch (std::bad_cast const& exception) {
+        throw CastOnMessageError(
+            dynamic_cast<MessageErrorResp const&>(*this).error
+        );
+    }
+}
 
 #endif
