@@ -127,6 +127,8 @@ class ReliableSocket {
         class PendingResponse {
             public:
                 Enveloped request;
+                uint8_t cooldown_exp;
+                uint64_t cooldown_counter;
                 uint64_t remaining_attempts;
                 Channel<Enveloped>::Sender callback;
 

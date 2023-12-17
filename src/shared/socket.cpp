@@ -250,6 +250,8 @@ ReliableSocket::PendingResponse::PendingResponse(
     Channel<Enveloped>::Sender&& callback
 ) :
     request(enveloped),
+    cooldown_exp(1),
+    cooldown_counter(1),
     remaining_attempts(max_req_attempts),
     callback(callback)
 {
@@ -498,17 +500,26 @@ void ReliableSocket::Inner::bump()
             uint64_t seqn = std::get<0>(pending_entry);
             PendingResponse& pending = std::get<1>(pending_entry);
 
-            if (pending.remaining_attempts == 0) {
-                seqn_to_be_removed.insert(seqn);
+            if (pending.cooldown_counter == 0) {
                 if (
-                    pending.request.message.body->tag().type == MSG_DISCONNECT
-                    || pending.request.message.body->tag().type == MSG_CONNECT
+                    pending.remaining_attempts == 0
+                    || pending.cooldown_exp == 0
                 ) {
-                    addresses_to_be_removed.insert(address);
+                    seqn_to_be_removed.insert(seqn);
+                    switch (pending.request.message.body->tag().type) {
+                        case MSG_DISCONNECT:
+                        case MSG_CONNECT:
+                            addresses_to_be_removed.insert(address);
+                            break;
+                    }
+                } else {
+                    pending.remaining_attempts--;
+                    this->udp.send(pending.request);
                 }
+                pending.cooldown_counter = 1 << pending.cooldown_exp;
+                pending.cooldown_exp++;
             } else {
-                pending.remaining_attempts--;
-                this->udp.send(pending.request);
+                pending.cooldown_counter--;
             }
         }
         for (uint64_t const& seqn : seqn_to_be_removed) {
@@ -528,9 +539,9 @@ void ReliableSocket::Inner::disconnect()
 }
 
 ReliableSocket::Config::Config() :
-    max_req_attempts(10),
-    max_cached_sent_resps(60000),
-    bump_interval_nanos(100 * 1000),
+    max_req_attempts(48),
+    max_cached_sent_resps(100),
+    bump_interval_nanos(1000 * 1000),
     poll_timeout_ms(10)
 {
 }
