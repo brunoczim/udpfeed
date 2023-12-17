@@ -241,7 +241,7 @@ class ReliableSocket {
             public:
                 Enveloped const& req_enveloped() const;
 
-                void send_resp(Message response) &&;
+                void send_resp(std::shared_ptr<MessageBody> const& response) &&;
         };
 
     private:
@@ -265,16 +265,22 @@ class ReliableSocket {
             Channel<Enveloped>&& handler_to_recv_req_channel
         );
 
+    private:
+        void close();
+
     public:
         ReliableSocket(
             Socket&& udp,
             Config config = Config()
         );
 
-        SentReq send_req(Enveloped message);
-        ReceivedReq receive_req();
+        ReliableSocket(ReliableSocket&& other);
+        ReliableSocket& operator=(ReliableSocket&& other);
 
         ~ReliableSocket();
+
+        SentReq send_req(Enveloped message);
+        ReceivedReq receive_req();
 };
 
 #endif

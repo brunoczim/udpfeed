@@ -529,8 +529,8 @@ void ReliableSocket::Inner::disconnect()
 
 ReliableSocket::Config::Config() :
     max_req_attempts(10),
-    max_cached_sent_resps(25),
-    bump_interval_nanos(500 * 100),
+    max_cached_sent_resps(60000),
+    bump_interval_nanos(100 * 1000),
     poll_timeout_ms(10)
 {
 }
@@ -589,11 +589,14 @@ Enveloped const& ReliableSocket::ReceivedReq::req_enveloped() const
     return this->req_enveloped_;
 }
 
-void ReliableSocket::ReceivedReq::send_resp(Message response) &&
+void ReliableSocket::ReceivedReq::send_resp(
+    std::shared_ptr<MessageBody> const& response
+) &&
 {
     Enveloped envloped_resp;
     envloped_resp.remote = this->req_enveloped_.remote;
-    envloped_resp.message = response;
+    envloped_resp.message.header = this->req_enveloped_.message.header;
+    envloped_resp.message.body = response;
     this->inner->send_resp(envloped_resp);
 }
 
@@ -679,12 +682,38 @@ ReliableSocket::ReliableSocket(
 {
 }
 
+ReliableSocket::ReliableSocket(ReliableSocket&& other) :
+    inner(std::move(other.inner)),
+    input_thread(std::move(other.input_thread)),
+    handler_thread(std::move(other.handler_thread)),
+    bumper_thread(std::move(other.bumper_thread))
+{
+}
+
+ReliableSocket& ReliableSocket::operator=(ReliableSocket&& other)
+{
+    this->close();
+    this->inner = std::move(other.inner);
+    this->input_thread = std::move(other.input_thread);
+    this->handler_thread = std::move(other.handler_thread);
+    this->bumper_thread = std::move(other.bumper_thread);
+
+    return *this;
+}
+
 ReliableSocket::~ReliableSocket()
 {
-    this->inner->disconnect();
-    this->input_thread.join();
-    this->handler_thread.join();
-    this->bumper_thread.join();
+    this->close();
+}
+
+void ReliableSocket::close()
+{
+    if (this->inner) {
+        this->inner->disconnect();
+        this->input_thread.join();
+        this->handler_thread.join();
+        this->bumper_thread.join();
+    }
 }
 
 ReliableSocket::SentReq ReliableSocket::send_req(Enveloped enveloped)

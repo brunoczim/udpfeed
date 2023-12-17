@@ -664,14 +664,114 @@ static TestSuite reliable_socket_test_suite()
                     == MessageTag(MSG_REQ, MSG_CONNECT)
             );
 
-            Message conn_resp;
-            conn_resp.header = recvd_conn_req.req_enveloped().message.header; 
-            conn_resp.body = std::shared_ptr<MessageBody>(
+            std::move(recvd_conn_req).send_resp(std::shared_ptr<MessageBody>(
                 new MessageConnectResp
-            );
-            std::move(recvd_conn_req).send_resp(conn_resp);
+            ));
 
             Enveloped recvd_conn_resp = std::move(sent_conn_req).receive_resp();
+            TEST_ASSERT(
+                "found " + recvd_conn_resp.message.body->tag().to_string(),
+                recvd_conn_resp.message.body->tag()
+                    == MessageTag(MSG_RESP, MSG_CONNECT)
+            );
+
+            Enveloped disconn_req;
+            disconn_req.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
+            disconn_req.message.body = std::shared_ptr<MessageBody>(
+                new MessageDisconnectReq
+            );
+            ReliableSocket::SentReq sent_disconn_req =
+                client.send_req(disconn_req);
+
+            ReliableSocket::ReceivedReq recvd_disconn_req =
+                server.receive_req();
+            TEST_ASSERT(
+                "found " + recvd_disconn_req.req_enveloped()
+                    .message.body->tag().to_string(),
+                recvd_disconn_req.req_enveloped().message.body->tag()
+                    == MessageTag(MSG_REQ, MSG_DISCONNECT)
+            );
+
+            std::move(recvd_disconn_req).send_resp(std::shared_ptr<MessageBody>(
+                new MessageDisconnectResp
+            ));
+
+            Enveloped recvd_disconn_resp =
+                std::move(sent_disconn_req).receive_resp();
+            TEST_ASSERT(
+                "found " + recvd_disconn_resp.message.body->tag().to_string(),
+                recvd_disconn_resp.message.body->tag()
+                    == MessageTag(MSG_RESP, MSG_DISCONNECT)
+            );
+        })
+
+        .test("one client, one server, multi thread", [] () {
+            Socket client_udp(500);
+            ReliableSocket client(std::move(client_udp));
+
+            Socket server_udp(500, 8082);
+            ReliableSocket server(std::move(server_udp));
+
+            std::thread server_thread([server = std::move(server)] () mutable {
+                ReliableSocket::ReceivedReq recvd_conn_req =
+                    server.receive_req();
+                TEST_ASSERT(
+                    "found " + recvd_conn_req.req_enveloped()
+                        .message.body->tag().to_string(),
+                    recvd_conn_req.req_enveloped().message.body->tag()
+                        == MessageTag(MSG_REQ, MSG_CONNECT)
+                );
+
+                std::move(recvd_conn_req).send_resp(
+                    std::shared_ptr<MessageBody>(new MessageConnectResp)
+                );
+
+                ReliableSocket::ReceivedReq recvd_disconn_req =
+                    server.receive_req();
+                TEST_ASSERT(
+                    "found " + recvd_disconn_req.req_enveloped()
+                        .message.body->tag().to_string(),
+                    recvd_disconn_req.req_enveloped().message.body->tag()
+                        == MessageTag(MSG_REQ, MSG_DISCONNECT)
+                );
+
+                std::move(recvd_disconn_req).send_resp(
+                    std::shared_ptr<MessageBody>(new MessageDisconnectResp)
+                );
+            });
+
+            Enveloped conn_req;
+            conn_req.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
+            conn_req.message.body = std::shared_ptr<MessageBody>(
+                new MessageConnectReq("bruno")
+            );
+            ReliableSocket::SentReq sent_conn_req = client.send_req(conn_req);
+
+
+            Enveloped recvd_conn_resp = std::move(sent_conn_req).receive_resp();
+            TEST_ASSERT(
+                "found " + recvd_conn_resp.message.body->tag().to_string(),
+                recvd_conn_resp.message.body->tag()
+                    == MessageTag(MSG_RESP, MSG_CONNECT)
+            );
+
+            Enveloped disconn_req;
+            disconn_req.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
+            disconn_req.message.body = std::shared_ptr<MessageBody>(
+                new MessageDisconnectReq
+            );
+            ReliableSocket::SentReq sent_disconn_req =
+                client.send_req(disconn_req);
+
+            Enveloped recvd_disconn_resp =
+                std::move(sent_disconn_req).receive_resp();
+            TEST_ASSERT(
+                "found " + recvd_disconn_resp.message.body->tag().to_string(),
+                recvd_disconn_resp.message.body->tag()
+                    == MessageTag(MSG_RESP, MSG_DISCONNECT)
+            );
+
+            server_thread.join();
         })
     ;
 }
