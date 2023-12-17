@@ -1,4 +1,4 @@
-#ifndef SHARED_CHANNEL_H
+#ifndef SHARED_CHANNEL_H_
 #define SHARED_CHANNEL_H_ 1
 
 #include <memory>

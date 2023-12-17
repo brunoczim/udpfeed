@@ -220,7 +220,9 @@ T& MessageBody::cast()
     try {
         return dynamic_cast<T&>(*this);
     } catch (std::bad_cast const& exception) {
-        throw CastOnMessageError(dynamic_cast<MessageError const&>(*this));
+        throw CastOnMessageError(
+            dynamic_cast<MessageErrorResp const&>(*this).error
+        );
     }
 }
 
@@ -230,7 +232,9 @@ T const& MessageBody::cast() const
     try {
         return dynamic_cast<T const&>(*this);
     } catch (std::bad_cast const& exception) {
-        throw CastOnMessageError(dynamic_cast<MessageError const&>(*this));
+        throw CastOnMessageError(
+            dynamic_cast<MessageErrorResp const&>(*this).error
+        );
     }
 }
 

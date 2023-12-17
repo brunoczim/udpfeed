@@ -407,11 +407,11 @@ static TestSuite socket_test_suite()
             Enveloped enveloped;
             enveloped.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             enveloped.message;
-            enveloped.message.header = MessageHeader::gen_request();
-            enveloped.message.body = std::shared_ptr<MessageConnectReq>(
+            enveloped.message.header.fill_req();
+            enveloped.message.body = std::shared_ptr<MessageBody>(
                 new MessageConnectReq("bruno")
             );
-            client.send(message);
+            client.send(enveloped);
 
             Enveloped received = server.receive();
 
@@ -434,7 +434,7 @@ static TestSuite socket_test_suite()
             );
 
             MessageConnectReq const& casted_body =
-                dynamic_cast<MessageConnectReq const&>(*received.message.body);
+                received.message.body->cast<MessageConnectReq>();
 
             TEST_ASSERT(
                 "message username should be \"bruno\", found: "
@@ -449,8 +449,8 @@ static TestSuite socket_test_suite()
 
             Enveloped request;
             request.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
-            request.message.header = MessageHeader::gen_request();
-            request.message.body = std::shared_ptr<MessageConnectReq>(
+            request.message.header.fill_req();
+            request.message.body = std::shared_ptr<MessageBody>(
                 new MessageConnectReq("bruno")
             );
             client.send(request);
@@ -464,9 +464,7 @@ static TestSuite socket_test_suite()
             );
 
             MessageConnectReq const& casted_req_body =
-                dynamic_cast<MessageConnectReq const&>(
-                    *received_req.message.body
-                );
+                received_req.message.body->cast<MessageConnectReq>();
 
             TEST_ASSERT(
                 "message username should be \"bruno\", found: "
@@ -476,31 +474,22 @@ static TestSuite socket_test_suite()
 
             Enveloped response;
             response.remote = received_req.remote;
-            response.enveloped.header =
-                MessageHeader::gen_response(received_req.header.seqn);
-            response.enveloped.body = std::shared_ptr<MessageConnectResp>(
-                new MessageConnectResp(MSG_OK)
+            response.message.header.fill_resp(received_req.message.header.seqn);
+            response.message.body = std::shared_ptr<MessageConnectResp>(
+                new MessageConnectResp
             );
             server.send(response);
 
             Enveloped received_resp = client.receive();
 
             TEST_ASSERT(
-                "found " + received_resp.body->tag().to_string(),
+                "found " + received_resp.message.body->tag().to_string(),
                 received_resp.message.body->tag()
                     == MessageTag(MSG_RESP, MSG_CONNECT)
             );
 
             MessageConnectResp const& casted_resp_body =
-                dynamic_cast<MessageConnectResp const&>(
-                    *received_resp.message.body
-                );
-
-            TEST_ASSERT(
-                "message status should be MSG_OK, found: "
-                    + casted_resp_body.status,
-                casted_resp_body.status == MSG_OK
-            );
+                received_resp.message.body->cast<MessageConnectResp>();
         })
 ;
 }
