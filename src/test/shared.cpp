@@ -642,7 +642,7 @@ static TestSuite channel_test_suite()
 static TestSuite reliable_socket_test_suite()
 {
     return TestSuite()
-        .test("one client, one server, single thread", [] () {
+        .test("one client, one server, single-threaded", [] () {
             Socket client_udp(500);
             ReliableSocket client(std::move(client_udp));
 
@@ -705,7 +705,7 @@ static TestSuite reliable_socket_test_suite()
             );
         })
 
-        .test("one client, one server, multi thread", [] () {
+        .test("one client, one server, multi-threaded", [] () {
             Socket client_udp(500);
             ReliableSocket client(std::move(client_udp));
 
@@ -771,6 +771,93 @@ static TestSuite reliable_socket_test_suite()
             );
 
             server_thread.join();
+        })
+
+        .test("multi client, multi-threaded", [] {
+            Socket server_udp(500, 8082);
+            ReliableSocket server(std::move(server_udp));
+
+            constexpr size_t thread_count = 4;
+
+            std::vector<std::thread> client_threads;
+
+            for (size_t i = 0; i < thread_count; i++) {
+                client_threads.push_back(std::move(std::thread([] () mutable {
+                    Socket client_udp(500);
+                    ReliableSocket client(std::move(client_udp));
+                    Enveloped conn_req;
+                    conn_req.remote =
+                        Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
+                    conn_req.message.body = std::shared_ptr<MessageBody>(
+                        new MessageConnectReq("bruno")
+                    );
+                    ReliableSocket::SentReq sent_conn_req =
+                        client.send_req(conn_req);
+
+                    Enveloped recvd_conn_resp =
+                        std::move(sent_conn_req).receive_resp();
+                    TEST_ASSERT(
+                        "found "
+                            + recvd_conn_resp.message.body->tag().to_string(),
+                        recvd_conn_resp.message.body->tag()
+                            == MessageTag(MSG_RESP, MSG_CONNECT)
+                    );
+
+                    Enveloped disconn_req;
+                    disconn_req.remote =
+                        Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
+                    disconn_req.message.body = std::shared_ptr<MessageBody>(
+                        new MessageDisconnectReq
+                    );
+                    ReliableSocket::SentReq sent_disconn_req =
+                        client.send_req(disconn_req);
+
+                    Enveloped recvd_disconn_resp =
+                        std::move(sent_disconn_req).receive_resp();
+                    TEST_ASSERT(
+                        "found "
+                            + recvd_disconn_resp.message.body->tag()
+                            .to_string(),
+                        recvd_disconn_resp.message.body->tag()
+                            == MessageTag(MSG_RESP, MSG_DISCONNECT)
+                    );
+                })));
+            }
+
+            size_t connected = 0;
+            size_t disconnected = 0;
+
+            while (disconnected < thread_count) {
+                ReliableSocket::ReceivedReq received = server.receive_req();
+                switch (received.req_enveloped().message.body->tag().type) {
+                    case MSG_CONNECT:
+                        std::move(received)
+                            .send_resp(std::shared_ptr<MessageBody>(
+                                new MessageConnectResp
+                            ));
+                        connected++;
+                        break;
+                    case MSG_DISCONNECT:
+                        std::move(received)
+                            .send_resp(std::shared_ptr<MessageBody>(
+                                new MessageDisconnectResp
+                            ));
+                        disconnected++;
+                        break;
+                    default:
+                        TEST_ASSERT(
+                            std::string("found: ")
+                                + received.req_enveloped().message.body->tag()
+                                .to_string(),
+                            false
+                        );
+                        break;
+                }
+            }
+
+            for (auto& thread : client_threads) {
+                thread.join();
+            }
         })
     ;
 }
