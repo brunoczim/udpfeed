@@ -11,6 +11,7 @@ static TestSuite plaintext_ser_test_suite();
 static TestSuite plaintext_de_test_suite();
 static TestSuite socket_test_suite();
 static TestSuite channel_test_suite();
+static TestSuite reliable_socket_test_suite();
 
 TestSuite shared_test_suite()
 {
@@ -20,6 +21,7 @@ TestSuite shared_test_suite()
         .append(plaintext_de_test_suite())
         .append(socket_test_suite())
         .append(channel_test_suite())
+        .append(reliable_socket_test_suite())
     ;
 }
 
@@ -634,5 +636,35 @@ static TestSuite channel_test_suite()
                 max_message = total_messages - 1
             );
         })
-;
+    ;
+}
+
+static TestSuite reliable_socket_test_suite()
+{
+    return TestSuite()
+        .test("one client, one server, single thread", [] () {
+            Socket client_udp(500);
+            ReliableSocket client(std::move(client_udp));
+
+            /*
+            Socket server_udp(500, 8082);
+            ReliableSocket server(std::move(server_udp));
+
+            Enveloped conn_req;
+            conn_req.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
+            conn_req.message.body = std::shared_ptr<MessageBody>(
+                new MessageConnectReq("bruno")
+            );
+            ReliableSocket::SentReq sent_conn_req = client.send_req(conn_req);
+            ReliableSocket::ReceivedReq recvd_conn_req = server.receive_req();
+
+            TEST_ASSERT(
+                "found " + recvd_conn_req.req_enveloped()
+                    .message.body->tag().to_string(),
+                recvd_conn_req.req_enveloped().message.body->tag()
+                    == MessageTag(MSG_REQ, MSG_CONNECT)
+            );
+            */
+        })
+    ;
 }

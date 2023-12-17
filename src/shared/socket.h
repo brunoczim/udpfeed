@@ -185,7 +185,7 @@ class ReliableSocket {
 
                 void unsafe_send_resp(Enveloped enveloped);
 
-                Enveloped receive_raw();
+                std::optional<Enveloped> receive_raw(int max_poll_wait_ms);
 
                 Enveloped receive();
 
@@ -196,6 +196,8 @@ class ReliableSocket {
                 void unsafe_handle_resp(Enveloped enveloped);
 
                 void bump();
+
+                void disconnect() &&;
         };
 
     public:
@@ -204,12 +206,14 @@ class ReliableSocket {
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
                 uint64_t bump_interval_nanos;
+                int max_poll_wait_ms;
 
                 Config();
 
                 Config& with_max_req_attempts(uint64_t val);
                 Config& with_max_cached_sent_resps(uint64_t val);
                 Config& with_bump_interval_nanos(uint64_t val);
+                Config& with_max_poll_wait_ms(int val);
         };
 
         class SentReq {
@@ -249,6 +253,7 @@ class ReliableSocket {
         ReliableSocket(
             std::shared_ptr<ReliableSocket::Inner> inner,
             uint64_t bump_interval_nanos,
+            int max_poll_wait_ms,
             Channel<Enveloped>&& input_to_handler_channel,
             Channel<Enveloped>::Sender&& handler_to_req_receiver
         );
