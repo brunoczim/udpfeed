@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <string>
 #include <iostream>
-#include "../shared/address.h"
+#include "communication.h"
 
 struct Arguments {
     std::string bind_address;
@@ -41,5 +41,10 @@ Arguments parse_arguments(int argc, char const *argv[])
         std::cerr << exception.what() << std::endl;
         exit(1);
     }
+
+    Socket udp(1024, arguments.bind_port);
+    ReliableSocket socket(std::move(udp));
+    ServerCommunicationManager comm_manager(std::move(socket));
+
     return arguments;
 }
