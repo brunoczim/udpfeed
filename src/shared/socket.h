@@ -85,13 +85,15 @@ class ExpectedResponse : public UnexpectedMessageStep {
         ExpectedResponse(Enveloped enveloped);
 };
 
-class ReceivedUnknownResp : public std::exception {
+class MissedResponse : public std::exception {
     private:
-        Enveloped enveloped_;
+        Enveloped req_enveloped_;
         std::string message;
+
     public:
-        ReceivedUnknownResp(Enveloped enveloped);
-        Enveloped enveloped() const;
+        MissedResponse(Enveloped const& req_enveloped);
+
+        Enveloped const& req_enveloped() const;
 
         virtual char const *what() const noexcept;
 };
@@ -222,10 +224,17 @@ class ReliableSocket {
             private:
                 friend ReliableSocket;
 
+                Enveloped req_enveloped_;
+
                 Channel<Enveloped>::Receiver channel;
 
-                SentReq(Channel<Enveloped>::Receiver&& channel);
+                SentReq(
+                    Enveloped req_enveloped,
+                    Channel<Enveloped>::Receiver&& channel
+                );
             public:
+                Enveloped const& req_enveloped() const;
+
                 Enveloped receive_resp() &&;
         };
 

@@ -8,6 +8,8 @@ class ServerCommunicationManager {
         ReliableSocket socket;
     public:
         ServerCommunicationManager(ReliableSocket&& socket);
+
+        void notify(Address remote, std::string const& notification);
 };
 
 #endif
