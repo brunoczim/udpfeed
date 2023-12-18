@@ -72,9 +72,11 @@ Serializer& operator<<(Serializer& serializer, MessageStep step);
 Deserializer& operator>>(Deserializer& deserializer, MessageStep &step);
 
 enum MessageType {
-    MSG_CONNECT,
     MSG_ERROR,
-    MSG_DISCONNECT
+    MSG_CONNECT,
+    MSG_DISCONNECT,
+    MSG_FOLLOW,
+    MSG_NOTIFY
 };
 
 class InvalidMessageType : public std::exception {
@@ -153,6 +155,19 @@ class MessageBody : public Serializable, public Deserializable {
         virtual ~MessageBody();
 };
 
+class MessageErrorResp : public MessageBody {
+    public:
+        MessageError error;
+
+        MessageErrorResp();
+        MessageErrorResp(MessageError error);
+
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
 class MessageConnectReq : public MessageBody {
     public:
         std::string username;
@@ -174,19 +189,6 @@ class MessageConnectResp : public MessageBody {
         virtual void deserialize(Deserializer& deserializer);
 };
 
-class MessageErrorResp : public MessageBody {
-    public:
-        MessageError error;
-
-        MessageErrorResp();
-        MessageErrorResp(MessageError error);
-
-        virtual MessageTag tag() const;
-
-        virtual void serialize(Serializer& serializer) const;
-        virtual void deserialize(Deserializer& deserializer);
-};
-
 class MessageDisconnectReq : public MessageBody {
     public:
         virtual MessageTag tag() const;
@@ -196,6 +198,48 @@ class MessageDisconnectReq : public MessageBody {
 };
 
 class MessageDisconnectResp : public MessageBody {
+    public:
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageFollowReq : public MessageBody {
+    public:
+        std::string username;
+
+        MessageFollowReq();
+        MessageFollowReq(std::string username);
+
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageFollowResp : public MessageBody {
+    public:
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageNotifyReq : public MessageBody {
+    public:
+        std::string notification;
+
+        MessageNotifyReq();
+        MessageNotifyReq(std::string notification);
+
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageNotifyResp : public MessageBody {
     public:
         virtual MessageTag tag() const;
 

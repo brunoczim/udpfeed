@@ -260,6 +260,32 @@ MessageBody::~MessageBody()
 {
 }
 
+MessageErrorResp::MessageErrorResp() : MessageErrorResp(MSG_INTERNAL_ERR)
+{
+}
+
+MessageErrorResp::MessageErrorResp(MessageError error) : error(error)
+{
+}
+
+MessageTag MessageErrorResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_ERROR);
+}
+
+void MessageErrorResp::serialize(Serializer& serializer) const
+{
+    serializer << (uint64_t) this->error;
+}
+
+void MessageErrorResp::deserialize(Deserializer& deserializer)
+{
+    uint64_t code;
+    deserializer >> code;
+    this->error = msg_error_from_code(code);
+}
+
+
 MessageConnectReq::MessageConnectReq() : MessageConnectReq(std::string())
 {
 }
@@ -296,31 +322,6 @@ void MessageConnectResp::deserialize(Deserializer& deserializer)
 {
 }
 
-MessageErrorResp::MessageErrorResp() : MessageErrorResp(MSG_INTERNAL_ERR)
-{
-}
-
-MessageErrorResp::MessageErrorResp(MessageError error) : error(error)
-{
-}
-
-MessageTag MessageErrorResp::tag() const
-{
-    return MessageTag(MSG_RESP, MSG_ERROR);
-}
-
-void MessageErrorResp::serialize(Serializer& serializer) const
-{
-    serializer << (uint64_t) this->error;
-}
-
-void MessageErrorResp::deserialize(Deserializer& deserializer)
-{
-    uint64_t code;
-    deserializer >> code;
-    this->error = msg_error_from_code(code);
-}
-
 MessageTag MessageDisconnectReq::tag() const
 {
     return MessageTag(MSG_REQ, MSG_DISCONNECT);
@@ -344,6 +345,79 @@ void MessageDisconnectResp::serialize(Serializer& serializer) const
 }
 
 void MessageDisconnectResp::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageFollowReq::MessageFollowReq() : MessageFollowReq(std::string())
+{
+}
+
+MessageFollowReq::MessageFollowReq(std::string username) : username(username)
+{
+}
+
+MessageTag MessageFollowReq::tag() const
+{
+    return MessageTag(MSG_REQ, MSG_FOLLOW);
+}
+
+void MessageFollowReq::serialize(Serializer& serializer) const
+{
+    serializer << this->username;
+}
+
+void MessageFollowReq::deserialize(Deserializer& deserializer)
+{
+    deserializer >> this->username;
+}
+
+MessageTag MessageFollowResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_FOLLOW);
+}
+
+void MessageFollowResp::serialize(Serializer& serializer) const
+{
+}
+
+void MessageFollowResp::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageNotifyReq::MessageNotifyReq() : MessageNotifyReq(std::string())
+{
+}
+
+MessageNotifyReq::MessageNotifyReq(std::string notification) :
+    notification(notification)
+{
+}
+
+MessageTag MessageNotifyReq::tag() const
+{
+    return MessageTag(MSG_REQ, MSG_NOTIFY);
+}
+
+void MessageNotifyReq::serialize(Serializer& serializer) const
+{
+    serializer << this->notification;
+}
+
+void MessageNotifyReq::deserialize(Deserializer& deserializer)
+{
+    deserializer >> this->notification;
+}
+
+MessageTag MessageNotifyResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_NOTIFY);
+}
+
+void MessageNotifyResp::serialize(Serializer& serializer) const
+{
+}
+
+void MessageNotifyResp::deserialize(Deserializer& deserializer)
 {
 }
 

@@ -221,25 +221,25 @@ ExpectedResponse::ExpectedResponse(Enveloped enveloped) :
 {
 }
 
-ReceivedUnknownResp::ReceivedUnknownResp(Enveloped enveloped) :
-    enveloped_(enveloped),
-    message("received a response to unknown message with tag = ")
+MissedResponse::MissedResponse(Enveloped const& req_enveloped) :
+    req_enveloped_(req_enveloped),
+    message("missed a response from the request enveloped with tag = ")
 {
-    this->message += enveloped.message.body->tag().to_string();
+    this->message += req_enveloped.message.body->tag().to_string();
     this->message += ", seqn = ";
-    this->message += std::to_string(enveloped.message.header.seqn);
+    this->message += std::to_string(req_enveloped.message.header.seqn);
     this->message += ", timestamp = ";
-    this->message += std::to_string(enveloped.message.header.timestamp);
-    this->message += ", from ";
-    this->message += enveloped.remote.to_string();
+    this->message += std::to_string(req_enveloped.message.header.timestamp);
+    this->message += ", to ";
+    this->message += req_enveloped.remote.to_string();
 }
 
-Enveloped ReceivedUnknownResp::enveloped() const
+Enveloped const& MissedResponse::req_enveloped() const
 {
-    return this->enveloped_;
+    return this->req_enveloped_;
 }
 
-char const *ReceivedUnknownResp::what() const noexcept
+char const *MissedResponse::what() const noexcept
 {
     return this->message.c_str();
 }
@@ -566,14 +566,28 @@ ReliableSocket::Config& ReliableSocket::Config::with_poll_timeout_ms(int val)
     return *this;
 }
 
-ReliableSocket::SentReq::SentReq(Channel<Enveloped>::Receiver&& channel) :
+ReliableSocket::SentReq::SentReq(
+    Enveloped req_enveloped,
+    Channel<Enveloped>::Receiver&& channel
+) :
+    req_enveloped_(req_enveloped),
     channel(channel)
 {
 }
 
+Enveloped const& ReliableSocket::SentReq::req_enveloped() const
+{
+    return this->req_enveloped_;
+}
+
 Enveloped ReliableSocket::SentReq::receive_resp() &&
 {
-    return std::move(*this).channel.receive();
+    Enveloped req_enveloped = this->req_enveloped();
+    try {
+        return std::move(*this).channel.receive();
+    } catch (ChannelDisconnected const& exc) {
+        throw MissedResponse(req_enveloped);
+    }
 }
 
 ReliableSocket::ReceivedReq::ReceivedReq(
@@ -723,7 +737,7 @@ ReliableSocket::SentReq ReliableSocket::send_req(Enveloped enveloped)
 {
     Channel<Enveloped> channel;
     this->inner->send_req(enveloped, std::move(channel.sender));
-    return ReliableSocket::SentReq(std::move(channel.receiver));
+    return ReliableSocket::SentReq(enveloped, std::move(channel.receiver));
 }
 
 ReliableSocket::ReceivedReq ReliableSocket::receive_req()
