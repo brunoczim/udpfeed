@@ -858,6 +858,15 @@ static TestSuite reliable_socket_test_suite()
             for (auto& thread : client_threads) {
                 thread.join();
             }
+
+            TEST_ASSERT(
+                std::string("connected: ") + std::to_string(connected),
+                thread_count == connected
+            );
+            TEST_ASSERT(
+                std::string("disconnected: ") + std::to_string(disconnected),
+                thread_count == disconnected
+            );
         })
     ;
 }
