@@ -1,10 +1,12 @@
 #include <set>
 #include <thread>
+#include <atomic>
 #include "shared.h"
 #include "../shared/address.h"
 #include "../shared/message.h"
 #include "../shared/socket.h"
 #include "../shared/channel.h"
+#include "../shared/tracker.h"
 
 static TestSuite parse_udp_port_test_suite();
 static TestSuite plaintext_ser_test_suite();
@@ -12,6 +14,7 @@ static TestSuite plaintext_de_test_suite();
 static TestSuite socket_test_suite();
 static TestSuite channel_test_suite();
 static TestSuite reliable_socket_test_suite();
+static TestSuite thread_tracker_test_suite();
 
 TestSuite shared_test_suite()
 {
@@ -22,6 +25,7 @@ TestSuite shared_test_suite()
         .append(socket_test_suite())
         .append(channel_test_suite())
         .append(reliable_socket_test_suite())
+        .append(thread_tracker_test_suite())
     ;
 }
 
@@ -866,6 +870,40 @@ static TestSuite reliable_socket_test_suite()
             TEST_ASSERT(
                 std::string("disconnected: ") + std::to_string(disconnected),
                 thread_count == disconnected
+            );
+        })
+    ;
+}
+
+static TestSuite thread_tracker_test_suite()
+{
+    return TestSuite()
+        .test("simple tracking", [] {
+            std::shared_ptr<std::atomic<uint32_t>> counter =
+                std::shared_ptr<std::atomic<uint32_t>>(
+                    new std::atomic<uint32_t>(0)
+                );
+
+            constexpr uint32_t thread_count = 500;
+
+            {
+                using namespace std::chrono_literals;
+
+                ThreadTracker thread_tracker;
+
+                for (uint32_t i = 0; i < thread_count; i++) {
+                    thread_tracker.spawn([counter] {
+                        std::this_thread::sleep_for(10us);
+                        counter->fetch_add(1);
+                    });
+                }
+            }
+
+            uint32_t actual_count = counter->load();
+
+            TEST_ASSERT(
+                std::string("found count: ") + std::to_string(actual_count),
+                thread_count == actual_count
             );
         })
     ;

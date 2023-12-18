@@ -169,7 +169,7 @@ void Channel<T>::Inner::send(T message)
     if (this->receivers == 0) {
         throw ReceiversDisconnected();
     }
-    this->messages.push(message);
+    this->messages.push(std::move(message));
     this->cond_var.notify_one();
 }
 
@@ -177,9 +177,9 @@ template <typename T>
 std::optional<T> Channel<T>::Inner::unsafe_try_receive()
 {
     if (!this->messages.empty()) {
-        T message = this->messages.front();
+        T message = std::move(this->messages.front());
         this->messages.pop();
-        return std::make_optional<T>(message);
+        return std::make_optional<T>(std::move(message));
     }
     if (this->senders == 0) {
         throw SendersDisconnected();
@@ -200,7 +200,7 @@ T Channel<T>::Inner::receive()
     std::unique_lock lock(this->mutex);
     for (;;) {
         if (auto message = this->unsafe_try_receive()) {
-            return *message;
+            return std::move(*message);
         }
         this->cond_var.wait(lock);
     }
@@ -264,7 +264,7 @@ void Channel<T>::Sender::send(T message)
     if (!this->inner) {
         throw UsageOfMovedChannel();
     }
-    this->inner->send(message);
+    this->inner->send(std::move(message));
 }
 
 template <typename T>
