@@ -255,6 +255,20 @@ class ReliableSocket {
                 void send_resp(std::shared_ptr<MessageBody> const& response) &&;
         };
 
+        class DisconnectGuard {
+            private:
+                std::shared_ptr<ReliableSocket> socket;
+            public:
+                DisconnectGuard(std::shared_ptr<ReliableSocket> const& socket);
+                ~DisconnectGuard();
+
+                ReliableSocket const& operator*() const;
+                ReliableSocket& operator*();
+
+                ReliableSocket const* operator->() const;
+                ReliableSocket* operator->();
+        };
+
     private:
         std::shared_ptr<Inner> inner;
         std::thread input_thread;

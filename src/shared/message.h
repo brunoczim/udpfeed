@@ -25,6 +25,7 @@ class InvalidMessagePayload: public std::exception {
 };
 
 enum MessageError {
+    MSG_OK,
     MSG_INTERNAL_ERR,
     MSG_NO_CONNECTION,
     MSG_OUTDATED_SEQN,
@@ -121,7 +122,7 @@ class MessageTag : public Serializable, public Deserializable {
 class MessageHeader : public Serializable, public Deserializable {
     public:
         uint64_t seqn;
-        uint64_t timestamp;
+        int64_t timestamp;
 
         MessageHeader();
 

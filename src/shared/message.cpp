@@ -79,9 +79,11 @@ const char *InvalidMessageType::what() const noexcept
 MessageType msg_type_from_code(uint16_t code)
 {
     switch (code) {
-        case MSG_CONNECT: return MSG_CONNECT;
         case MSG_ERROR: return MSG_ERROR;
+        case MSG_CONNECT: return MSG_CONNECT;
         case MSG_DISCONNECT: return MSG_DISCONNECT;
+        case MSG_FOLLOW: return MSG_FOLLOW;
+        case MSG_NOTIFY: return MSG_NOTIFY;
         default: throw InvalidMessageType(code);
     }
 }
@@ -121,6 +123,7 @@ const char *InvalidMessageError::what() const noexcept
 MessageError msg_error_from_code(uint16_t code)
 {
     switch (code) {
+        case MSG_OK: return MSG_OK;
         case MSG_INTERNAL_ERR: return MSG_INTERNAL_ERR;
         case MSG_NO_CONNECTION: return MSG_NO_CONNECTION;
         case MSG_OUTDATED_SEQN: return MSG_OUTDATED_SEQN;

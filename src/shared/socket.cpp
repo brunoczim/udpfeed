@@ -617,6 +617,40 @@ void ReliableSocket::ReceivedReq::send_resp(
     this->inner->send_resp(envloped_resp);
 }
 
+ReliableSocket::DisconnectGuard::DisconnectGuard(
+    std::shared_ptr<ReliableSocket> const& socket
+) :
+    socket(socket)
+{
+}
+
+ReliableSocket::DisconnectGuard::~DisconnectGuard()
+{
+    if (this->socket) {
+        auto closed_ = std::move(*this->socket);
+    }
+}
+
+ReliableSocket const& ReliableSocket::DisconnectGuard::operator*() const
+{
+    return *this->socket;
+}
+
+ReliableSocket& ReliableSocket::DisconnectGuard::operator*()
+{
+    return *this->socket;
+}
+
+ReliableSocket const* ReliableSocket::DisconnectGuard::operator->() const
+{
+    return this->socket.operator->();
+}
+
+ReliableSocket* ReliableSocket::DisconnectGuard::operator->()
+{
+    return this->socket.operator->();
+}
+
 ReliableSocket::ReliableSocket(
     std::shared_ptr<ReliableSocket::Inner> inner,
     uint64_t bump_interval_nanos,
