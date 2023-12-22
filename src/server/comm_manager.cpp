@@ -4,8 +4,7 @@
 void start_server_communication_manager(
     ThreadTracker& thread_tracker,
     ReliableSocket&& reliable_socket,
-    Channel<std::pair<Address, std::string>>::Receiver&& from_notif_man,
-    Channel<ReliableSocket::ReceivedReq>::Sender&& to_notif_man,
+    Channel<Enveloped>::Receiver&& from_notif_man,
     Channel<ReliableSocket::ReceivedReq>::Sender&& to_profile_man
 )
 {
@@ -21,26 +20,17 @@ void start_server_communication_manager(
 
         try {
             for (;;) {
-                std::pair<Address, std::string> notify_pair =
-                    from_notif_man.receive();
-                Address remote = std::get<0>(notify_pair);
-                std::string const& notification = std::get<1>(notify_pair);
-
-                Enveloped enveloped;
-                enveloped.remote = remote;
-                enveloped.message.body = std::shared_ptr<MessageBody>(
-                    new MessageNotifyReq(notification)
-                );
-
+                Enveloped notif_enveloped = from_notif_man.receive();
                 try {
-                    Enveloped response = 
-                        std::move(socket->send_req(enveloped)).receive_resp();
+                    ReliableSocket::SentReq sent_req =
+                        socket->send_req(notif_enveloped);
+                    Enveloped response = std::move(sent_req).receive_resp();
 
                     response.message.body->cast<MessageNotifyResp>();
                 } catch (std::exception const& exc) {
                     std::cerr
                         << "error notifying connection "
-                        << remote.to_string()
+                        << notif_enveloped.remote.to_string()
                         << " : "
                         << exc.what()
                         << std::endl;
@@ -52,7 +42,6 @@ void start_server_communication_manager(
 
     thread_tracker.spawn([
         socket,
-        to_notif_man = std::move(to_notif_man),
         to_profile_man = std::move(to_profile_man)
     ] () mutable {
         ReliableSocket::DisconnectGuard guard_(socket);
@@ -70,11 +59,8 @@ void start_server_communication_manager(
                     case MSG_CONNECT:
                     case MSG_DISCONNECT:
                     case MSG_FOLLOW:
-                        to_profile_man.send(req);
-                        break;
-
                     case MSG_NOTIFY:
-                        to_notif_man.send(req);
+                        to_profile_man.send(req);
                         break;
                 }
             }

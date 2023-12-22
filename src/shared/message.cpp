@@ -294,11 +294,12 @@ void MessageErrorResp::deserialize(Deserializer& deserializer)
 }
 
 
-MessageConnectReq::MessageConnectReq() : MessageConnectReq(std::string())
+MessageConnectReq::MessageConnectReq()
 {
 }
 
-MessageConnectReq::MessageConnectReq(std::string username) : username(username)
+MessageConnectReq::MessageConnectReq(Username const& username) :
+    username(username)
 {
 }
 
@@ -360,7 +361,8 @@ MessageFollowReq::MessageFollowReq() : MessageFollowReq(std::string())
 {
 }
 
-MessageFollowReq::MessageFollowReq(std::string username) : username(username)
+MessageFollowReq::MessageFollowReq(Username const& username) :
+    username(username)
 {
 }
 
@@ -392,12 +394,16 @@ void MessageFollowResp::deserialize(Deserializer& deserializer)
 {
 }
 
-MessageNotifyReq::MessageNotifyReq() : MessageNotifyReq(std::string())
+MessageNotifyReq::MessageNotifyReq()
 {
 }
 
-MessageNotifyReq::MessageNotifyReq(std::string notification) :
-    notification(notification)
+MessageNotifyReq::MessageNotifyReq(
+    Username const& sender,
+    NotifMessage const& notif_msg
+) :
+    sender(sender),
+    notif_message(notif_msg)
 {
 }
 
@@ -408,12 +414,12 @@ MessageTag MessageNotifyReq::tag() const
 
 void MessageNotifyReq::serialize(Serializer& serializer) const
 {
-    serializer << this->notification;
+    serializer << this->sender << this->notif_message;
 }
 
 void MessageNotifyReq::deserialize(Deserializer& deserializer)
 {
-    deserializer >> this->notification;
+    deserializer >> this->sender >> this->notif_message;
 }
 
 MessageTag MessageNotifyResp::tag() const

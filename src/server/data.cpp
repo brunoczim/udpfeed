@@ -112,6 +112,7 @@ void ServerProfileTable::follow(
 void ServerProfileTable::notify(
     Address client,
     NotifMessage message,
+    Channel<Username>::Sender& followers_sender,
     int64_t timestamp
 )
 {
@@ -143,6 +144,7 @@ void ServerProfileTable::notify(
         if (followed_node == this->profiles.end()) {
             throw ThrowableMessageError(MSG_UNKNOWN_USERNAME);
         }
+        followers_sender.send(follower_username);
         Profile& follower = std::get<1>(*followed_node);
         follower.pending_notifs.push_back(std::make_pair(
             sender_username,
