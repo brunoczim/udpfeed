@@ -2,6 +2,8 @@
 #define SHARED_MESSAGE_H_ 1
 
 #include "serialization.h"
+#include "username.h"
+#include "notif_message.h"
 #include "address.h"
 
 #include <cstdint>
@@ -172,10 +174,10 @@ class MessageErrorResp : public MessageBody {
 
 class MessageConnectReq : public MessageBody {
     public:
-        std::string username;
+        Username username;
 
         MessageConnectReq();
-        MessageConnectReq(std::string username);
+        MessageConnectReq(Username const& username);
 
         virtual MessageTag tag() const;
 
@@ -209,10 +211,10 @@ class MessageDisconnectResp : public MessageBody {
 
 class MessageFollowReq : public MessageBody {
     public:
-        std::string username;
+        Username username;
 
         MessageFollowReq();
-        MessageFollowReq(std::string username);
+        MessageFollowReq(Username const& username);
 
         virtual MessageTag tag() const;
 
@@ -230,10 +232,11 @@ class MessageFollowResp : public MessageBody {
 
 class MessageNotifyReq : public MessageBody {
     public:
-        std::string notification;
+        Username sender;
+        NotifMessage notif_message;
 
         MessageNotifyReq();
-        MessageNotifyReq(std::string notification);
+        MessageNotifyReq(Username const& sender, NotifMessage const& notif_msg);
 
         virtual MessageTag tag() const;
 

@@ -7,6 +7,8 @@
 #include "../shared/socket.h"
 #include "../shared/channel.h"
 #include "../shared/tracker.h"
+#include "../shared/username.h"
+#include "../shared/notif_message.h"
 
 static TestSuite parse_udp_port_test_suite();
 static TestSuite plaintext_ser_test_suite();
@@ -15,6 +17,8 @@ static TestSuite socket_test_suite();
 static TestSuite channel_test_suite();
 static TestSuite reliable_socket_test_suite();
 static TestSuite thread_tracker_test_suite();
+static TestSuite username_test_suite();
+static TestSuite notif_message_test_suite();
 
 TestSuite shared_test_suite()
 {
@@ -26,6 +30,8 @@ TestSuite shared_test_suite()
         .append(channel_test_suite())
         .append(reliable_socket_test_suite())
         .append(thread_tracker_test_suite())
+        .append(username_test_suite())
+        .append(notif_message_test_suite())
     ;
 }
 
@@ -415,7 +421,7 @@ static TestSuite socket_test_suite()
             enveloped.message;
             enveloped.message.header.fill_req();
             enveloped.message.body = std::shared_ptr<MessageBody>(
-                new MessageConnectReq("bruno")
+                new MessageConnectReq(Username("@bruno"))
             );
             client.send(enveloped);
 
@@ -443,9 +449,9 @@ static TestSuite socket_test_suite()
                 received.message.body->cast<MessageConnectReq>();
 
             TEST_ASSERT(
-                "message username should be \"bruno\", found: "
-                    + casted_body.username,
-                casted_body.username == "bruno"
+                std::string("message username should be \"bruno\", found: ")
+                    + casted_body.username.content(),
+                casted_body.username == Username("@bruno")
             );
         })
 
@@ -457,7 +463,7 @@ static TestSuite socket_test_suite()
             request.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             request.message.header.fill_req();
             request.message.body = std::shared_ptr<MessageBody>(
-                new MessageConnectReq("bruno")
+                new MessageConnectReq(Username("@bruno"))
             );
             client.send(request);
 
@@ -474,8 +480,8 @@ static TestSuite socket_test_suite()
 
             TEST_ASSERT(
                 "message username should be \"bruno\", found: "
-                    + casted_req_body.username,
-                casted_req_body.username == "bruno"
+                    + casted_req_body.username.content(),
+                casted_req_body.username == Username("@bruno")
             );
 
             Enveloped response;
@@ -656,7 +662,7 @@ static TestSuite reliable_socket_test_suite()
             Enveloped conn_req;
             conn_req.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             conn_req.message.body = std::shared_ptr<MessageBody>(
-                new MessageConnectReq("bruno")
+                new MessageConnectReq(Username("@bruno"))
             );
             ReliableSocket::SentReq sent_conn_req = client.send_req(conn_req);
 
@@ -747,7 +753,7 @@ static TestSuite reliable_socket_test_suite()
             Enveloped conn_req;
             conn_req.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             conn_req.message.body = std::shared_ptr<MessageBody>(
-                new MessageConnectReq("bruno")
+                new MessageConnectReq(Username("@bruno"))
             );
             ReliableSocket::SentReq sent_conn_req = client.send_req(conn_req);
 
@@ -793,7 +799,7 @@ static TestSuite reliable_socket_test_suite()
                     conn_req.remote =
                         Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
                     conn_req.message.body = std::shared_ptr<MessageBody>(
-                        new MessageConnectReq("bruno")
+                        new MessageConnectReq(Username("@bruno"))
                     );
                     ReliableSocket::SentReq sent_conn_req =
                         client.send_req(conn_req);
@@ -905,6 +911,95 @@ static TestSuite thread_tracker_test_suite()
                 std::string("found count: ") + std::to_string(actual_count),
                 thread_count == actual_count
             );
+        })
+    ;
+}
+
+static TestSuite username_test_suite()
+{
+    return TestSuite()
+        .test("min username is accepted", [] {
+            Username("@abcd");
+        })
+        .test("max username is accepted", [] {
+            Username("@abcdef0123456789abcd");
+        })
+        .test("username below min is rejected", [] {
+            bool thrown = false;
+            try {
+                Username("@abc");
+            } catch (InvalidUsername const& exc) {
+                thrown = true;
+            }
+            TEST_ASSERT("should have thrown", thrown);
+        })
+        .test("username above max is rejected", [] {
+            bool thrown = false;
+            try {
+                Username("@abcdef0123456789abcde");
+            } catch (InvalidUsername const& exc) {
+                thrown = true;
+            }
+            TEST_ASSERT("should have thrown", thrown);
+        })
+        .test("invalid username byte is rejected", [] {
+            bool thrown = false;
+            try {
+                Username("@bruno!");
+            } catch (InvalidUsername const& exc) {
+                thrown = true;
+            }
+            TEST_ASSERT("should have thrown", thrown);
+        })
+    ;
+}
+
+static TestSuite notif_message_test_suite()
+{
+    return TestSuite()
+        .test("min notification is accepted", [] {
+            NotifMessage("a");
+        })
+        .test("max notification is accepted", [] {
+            NotifMessage(
+                std::string("0123456789abcdef")
+                    + "0123456789abcdef"
+                    + "0123456789abcdef"
+                    + "0123456789abcdef"
+
+                    + "0123456789abcdef"
+                    + "0123456789abcdef"
+                    + "0123456789abcdef"
+                    + "0123456789abcdef"
+            );
+        })
+        .test("notification below min is rejected", [] {
+            bool thrown = false;
+            try {
+                NotifMessage("");
+            } catch (InvalidNotifMessage const& exc) {
+                thrown = true;
+            }
+            TEST_ASSERT("should have thrown", thrown);
+        })
+        .test("notification above max is rejected", [] {
+            bool thrown = false;
+            try {
+                NotifMessage(
+                    std::string("0123456789abcdef")
+                        + "0123456789abcdef"
+                        + "0123456789abcdef"
+                        + "0123456789abcdef"
+
+                        + "0123456789abcdef"
+                        + "0123456789abcdef"
+                        + "0123456789abcdef"
+                        + "0123456789abcdef0"
+                );
+            } catch (InvalidNotifMessage const& exc) {
+                thrown = true;
+            }
+            TEST_ASSERT("should have thrown", thrown);
         })
     ;
 }
