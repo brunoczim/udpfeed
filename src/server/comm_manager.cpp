@@ -5,7 +5,6 @@ void start_server_communication_manager(
     ThreadTracker& thread_tracker,
     ReliableSocket&& reliable_socket,
     Channel<Enveloped>::Receiver&& from_notif_man,
-    Channel<ReliableSocket::ReceivedReq>::Sender&& to_notif_man,
     Channel<ReliableSocket::ReceivedReq>::Sender&& to_profile_man
 )
 {
@@ -43,7 +42,6 @@ void start_server_communication_manager(
 
     thread_tracker.spawn([
         socket,
-        to_notif_man = std::move(to_notif_man),
         to_profile_man = std::move(to_profile_man)
     ] () mutable {
         ReliableSocket::DisconnectGuard guard_(socket);
@@ -61,11 +59,8 @@ void start_server_communication_manager(
                     case MSG_CONNECT:
                     case MSG_DISCONNECT:
                     case MSG_FOLLOW:
-                        to_profile_man.send(req);
-                        break;
-
                     case MSG_NOTIFY:
-                        to_notif_man.send(req);
+                        to_profile_man.send(req);
                         break;
                 }
             }

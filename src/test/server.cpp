@@ -65,10 +65,20 @@ static TestSuite server_data_test_suite()
                 Username("@helloworld"),
                 2
             );
+
+            Channel<Username> channel;
             table.notify(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 NotifMessage("Hello, World!"),
+                channel.sender,
                 3
+            );
+
+            Username follower_username = channel.receiver.receive();
+            TEST_ASSERT(
+                "follower user name should be @goodbye, found"
+                    + follower_username.content(),
+                follower_username == Username("@goodbye")
             );
 
             std::optional<PendingNotif> pending_notif;
@@ -150,19 +160,25 @@ static TestSuite server_data_test_suite()
                 Username("@cavejohnson"),
                 8
             );
+
+            Channel<Username> channel;
+
             table.notify(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 NotifMessage("Hello"),
+                channel.sender,
                 9
             );
             table.notify(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 NotifMessage("Bye"),
+                channel.sender,
                 10 
             );
             table.notify(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 6667),
                 NotifMessage("...wait"),
+                channel.sender,
                 11 
             );
             table.disconnect(
@@ -172,7 +188,8 @@ static TestSuite server_data_test_suite()
             table.notify(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 NotifMessage("Bye Bye Bye"),
-                10 
+                channel.sender,
+                13 
             );
 
             std::optional<PendingNotif> pending_notif;
@@ -360,6 +377,26 @@ static TestSuite server_data_test_suite()
                 "optional should be null",
                 !pending_notif.has_value()
             );
+
+            table.disconnect(
+                Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
+                14 
+            );
+
+            table.disconnect(
+                Address(make_ipv4({ 127, 0, 0, 1 }), 6667),
+                15 
+            );
+
+            table.disconnect(
+                Address(make_ipv4({ 127, 0, 0, 1 }), 7878),
+                16 
+            );
+
+            table.disconnect(
+                Address(make_ipv4({ 127, 0, 0, 1 }), 4545),
+                17 
+            );
         })
 
         .test("do not allow three sessions", [] {
@@ -438,9 +475,11 @@ static TestSuite server_data_test_suite()
             ServerProfileTable table;
             std::optional<MessageError> error;
             try {
+                Channel<Username> channel;
                 table.notify(
                     Address(make_ipv4({ 127, 0, 0, 1 }), 4545),
                     NotifMessage("blablabla"),
+                    channel.sender,
                     0
                 );
             } catch (ThrowableMessageError const& exc) {

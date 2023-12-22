@@ -32,7 +32,6 @@ void start_server_notification_manager(
                         to_comm_man.send(enveloped);
                     }
                 }
-                
             }
         } catch (ChannelDisconnected const& exc) {
         }

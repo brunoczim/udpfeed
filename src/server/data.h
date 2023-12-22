@@ -75,6 +75,7 @@ class ServerProfileTable : public Serializable, public Deserializable {
         void notify(
             Address client,
             NotifMessage message,
+            Channel<Username>::Sender& followers_sender,
             int64_t timestamp
         );
 
@@ -83,7 +84,5 @@ class ServerProfileTable : public Serializable, public Deserializable {
         virtual void serialize(Serializer& stream) const;
         virtual void deserialize(Deserializer& stream);
 };
-
-
 
 #endif
