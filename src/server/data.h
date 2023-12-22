@@ -72,7 +72,13 @@ class ServerProfileTable : public Serializable, public Deserializable {
             int64_t timestamp
         );
 
-        std::optional<PendingNotif> read_pending_notif(Username username);
+        void notify(
+            Address client,
+            NotifMessage message,
+            int64_t timestamp
+        );
+
+        std::optional<PendingNotif> consume_one_notif(Username username);
 
         virtual void serialize(Serializer& stream) const;
         virtual void deserialize(Deserializer& stream);
