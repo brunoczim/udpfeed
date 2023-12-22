@@ -525,7 +525,7 @@ void ReliableSocket::Inner::bump()
 
 void ReliableSocket::Inner::disconnect()
 {
-    auto closed_ = std::move(this->handler_to_req_receiver);
+    this->handler_to_req_receiver.disconnect();
 }
 
 ReliableSocket::Config::Config() :
@@ -617,6 +617,40 @@ void ReliableSocket::ReceivedReq::send_resp(
     this->inner->send_resp(envloped_resp);
 }
 
+ReliableSocket::DisconnectGuard::DisconnectGuard(
+    std::shared_ptr<ReliableSocket> const& socket
+) :
+    socket(socket)
+{
+}
+
+ReliableSocket::DisconnectGuard::~DisconnectGuard()
+{
+    if (this->socket) {
+        auto closed_ = std::move(*this->socket);
+    }
+}
+
+ReliableSocket const& ReliableSocket::DisconnectGuard::operator*() const
+{
+    return *this->socket;
+}
+
+ReliableSocket& ReliableSocket::DisconnectGuard::operator*()
+{
+    return *this->socket;
+}
+
+ReliableSocket const* ReliableSocket::DisconnectGuard::operator->() const
+{
+    return this->socket.operator->();
+}
+
+ReliableSocket* ReliableSocket::DisconnectGuard::operator->()
+{
+    return this->socket.operator->();
+}
+
 ReliableSocket::ReliableSocket(
     std::shared_ptr<ReliableSocket::Inner> inner,
     uint64_t bump_interval_nanos,
@@ -632,8 +666,20 @@ ReliableSocket::ReliableSocket(
         channel = std::move(input_to_handler_channel.sender)
     ] () mutable {
         try {
-            while (auto enveloped = inner->receive_raw(poll_timeout_ms)) {
-                channel.send(*enveloped);
+            bool connected = true;
+            while (connected) {
+                try {
+                    if (auto enveloped = inner->receive_raw(poll_timeout_ms)) {
+                        channel.send(*enveloped); 
+                    } else {
+                        connected = false;
+                    }
+                } catch (DeserializationError const& exc) {
+                    std::cerr
+                        << "failed to deserialize a packet: "
+                        << exc.what()
+                        << std::endl;
+                }
             }
         } catch (ChannelDisconnected const& exc) {
         }

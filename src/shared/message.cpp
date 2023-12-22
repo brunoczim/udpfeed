@@ -9,17 +9,12 @@ const char *MessageOutOfProtocol::what() const noexcept
 }
 
 InvalidMessagePayload::InvalidMessagePayload(std::string const& error_message) :
-    error_message(error_message)
+    DeserializationError(error_message)
 {
-}
-
-const char *InvalidMessagePayload::what() const noexcept
-{
-    return this->error_message.c_str();
 }
 
 InvalidMessageStep::InvalidMessageStep(uint16_t code) :
-    message("invalid message step code: "),
+    DeserializationError("invalid message step code: "),
     code_(code)
 {
     this->message += std::to_string(code);
@@ -28,11 +23,6 @@ InvalidMessageStep::InvalidMessageStep(uint16_t code) :
 uint16_t InvalidMessageStep::code() const
 {
     return this->code_;
-}
-
-const char *InvalidMessageStep::what() const noexcept
-{
-    return this->message.c_str();
 }
 
 MessageStep msg_step_from_code(uint16_t code)
@@ -60,7 +50,7 @@ Deserializer& operator>>(Deserializer& deserializer, MessageStep &step)
 }
 
 InvalidMessageType::InvalidMessageType(uint16_t code) :
-    message("invalid message type code: "),
+    DeserializationError("invalid message type code: "),
     code_(code)
 {
     this->message += std::to_string(code);
@@ -71,17 +61,14 @@ uint16_t InvalidMessageType::code() const
     return this->code_;
 }
 
-const char *InvalidMessageType::what() const noexcept
-{
-    return this->message.c_str();
-}
-
 MessageType msg_type_from_code(uint16_t code)
 {
     switch (code) {
-        case MSG_CONNECT: return MSG_CONNECT;
         case MSG_ERROR: return MSG_ERROR;
+        case MSG_CONNECT: return MSG_CONNECT;
         case MSG_DISCONNECT: return MSG_DISCONNECT;
+        case MSG_FOLLOW: return MSG_FOLLOW;
+        case MSG_NOTIFY: return MSG_NOTIFY;
         default: throw InvalidMessageType(code);
     }
 }
@@ -101,8 +88,22 @@ Deserializer& operator>>(Deserializer& deserializer, MessageType &type)
     return deserializer;
 }
 
+ThrowableMessageError::ThrowableMessageError(MessageError error) : error_(error)
+{
+}
+
+MessageError ThrowableMessageError::error() const
+{
+    return this->error_;
+}
+
+char const *ThrowableMessageError::what() const noexcept
+{
+    return msg_error_render(this->error());
+}
+
 InvalidMessageError::InvalidMessageError(uint16_t code) :
-    message("invalid message error code: "),
+    DeserializationError("invalid message error code: "),
     code_(code)
 {
     this->message += std::to_string(code);
@@ -113,20 +114,27 @@ uint16_t InvalidMessageError::code() const
     return this->code_;
 }
 
-const char *InvalidMessageError::what() const noexcept
-{
-    return this->message.c_str();
-}
-
 MessageError msg_error_from_code(uint16_t code)
 {
     switch (code) {
         case MSG_INTERNAL_ERR: return MSG_INTERNAL_ERR;
         case MSG_NO_CONNECTION: return MSG_NO_CONNECTION;
         case MSG_OUTDATED_SEQN: return MSG_OUTDATED_SEQN;
-        case MSG_BAD_USERNAME: return MSG_BAD_USERNAME;
+        case MSG_UNKNOWN_USERNAME: return MSG_UNKNOWN_USERNAME;
         case MSG_TOO_MANY_SESSIONS: return MSG_TOO_MANY_SESSIONS;
         default: throw InvalidMessageError(code);
+    }
+}
+
+char const *msg_error_render(MessageError error)
+{
+    switch (error) {
+        case MSG_INTERNAL_ERR: return "internal error";
+        case MSG_NO_CONNECTION: return "no connection estabilished";
+        case MSG_OUTDATED_SEQN: return "message sequence number is outdated";
+        case MSG_UNKNOWN_USERNAME: return "given username is unknown";
+        case MSG_TOO_MANY_SESSIONS: return "profile has too many sessions";
+        default: return "unknown error";
     }
 }
 

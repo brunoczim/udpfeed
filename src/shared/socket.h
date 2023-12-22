@@ -165,6 +165,7 @@ class ReliableSocket {
                 Socket udp;
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
+
                 Channel<Enveloped>::Receiver handler_to_req_receiver;
 
                 std::mutex net_control_mutex;
@@ -253,6 +254,20 @@ class ReliableSocket {
                 Enveloped const& req_enveloped() const;
 
                 void send_resp(std::shared_ptr<MessageBody> const& response) &&;
+        };
+
+        class DisconnectGuard {
+            private:
+                std::shared_ptr<ReliableSocket> socket;
+            public:
+                DisconnectGuard(std::shared_ptr<ReliableSocket> const& socket);
+                ~DisconnectGuard();
+
+                ReliableSocket const& operator*() const;
+                ReliableSocket& operator*();
+
+                ReliableSocket const* operator->() const;
+                ReliableSocket* operator->();
         };
 
     private:

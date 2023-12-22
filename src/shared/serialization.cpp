@@ -11,6 +11,10 @@ const char *SerializationError::what() const noexcept
     return message.c_str();
 }
 
+SerializationError::~SerializationError()
+{
+}
+
 DeserializationError::DeserializationError(std::string const& message) :
     message(message)
 {
@@ -19,6 +23,10 @@ DeserializationError::DeserializationError(std::string const& message) :
 const char *DeserializationError::what() const noexcept
 {
     return message.c_str();
+}
+
+DeserializationError::~DeserializationError()
+{
 }
 
 DeserializationUnexpectedEof::DeserializationUnexpectedEof() :

@@ -1,0 +1,116 @@
+#ifndef SERVER_PROFILE_H_
+#define SERVER_PROFILE_H_ 1
+
+#include <string>
+#include <set>
+#include <map>
+#include "../shared/serialization.h"
+#include "../shared/channel.h"
+
+class ServerProfileTableShutdown : public std::exception {
+    public:
+        virtual char const *what() const noexcept;
+};
+
+class ServerNotification : public Serializable, public Deserializable {
+    public:
+        uint64_t id;
+        int64_t timestamp;
+        std::string content;
+        uint64_t pending_count;
+
+        ServerNotification();
+
+        virtual void serialize(Serializer& stream) const;
+        virtual void deserialize(Deserializer& stream);
+};
+
+class ServerProfile : public Serializable, public Deserializable {
+    private:
+        std::condition_variable notif_cond_var;
+
+        uint64_t notif_counter;
+        std::string username;
+        std::map<std::string, int64_t> followers;
+        std::map<uint64_t, Notification> received_notifs;
+        std::queue<std::pair<std::string, uint64_t>> pending_notifs;
+
+    public:
+        ServerProfile();
+
+        virtual void serialize(Serializer& stream) const;
+        virtual void deserialize(Deserializer& stream);
+};
+
+class ServerProfileTable : public Serializable, public Deserializable {
+    public:
+        class Handle;
+
+    private:
+        std::condition_variable new_profile_cond_var;
+
+        std::map<std::string, Profile> profiles;
+        std::queue<std::string> new_profiles;
+
+    public:
+        ServerProfileTable();
+
+        virtual void serialize(Serializer& stream) const;
+        virtual void deserialize(Deserializer& stream);
+};
+
+class ServerProfileTable::Handle {
+    public:
+        class ProilefMan {
+        };
+
+        class NotifMan {
+        };
+};
+
+class ServerProfileTable::ProfManHandle {
+    private:
+        std::shared_ptr<ProfileTable> profile_table;
+
+    public:
+        ProfManHandle(std::shared_ptr<ProfileTable> const& profile_table);
+        ProfManHandle(ProfManHandle const& other);
+        ProfManHandle& operator=(ProfManHandle const& other);
+        ~ProfileManHandle();
+
+        MessageError start_session(
+            Address address,
+            std::string username
+        );
+
+        MessageError end_session(Address address);
+
+        MessageError follow(
+            std::string followed,
+            std::string follower,
+            int64_t timestamp
+        );
+
+        MessageError notify(
+            std::string notifier,
+            std::string content,
+            int64_t timestamp
+        );
+};
+
+
+class ServerProfileTable::NotifManHandle {
+    private:
+        std::shared_ptr<ProfileTable> profile_table;
+
+    public:
+        NotifManHandle(std::shared_ptr<ProfileTable> const& profile_table);
+        NotifManHandle(NotifManHandle const& other);
+        NotifManHandle& operator=(NotifManHandle const& other);
+        ~NotifManHandle();
+
+        std::string const& subscribe_one_new_prof();
+        void subscribe_one_notif(std::string const& username);
+};
+
+#endif
