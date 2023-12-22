@@ -76,6 +76,7 @@ void ServerProfileTable::connect(
     }
 
     profile.sessions.insert(client);
+    this->sessions.insert(std::make_pair(client, profile_username));
 }
 
 void ServerProfileTable::disconnect(Address client, int64_t timestamp)
@@ -108,7 +109,50 @@ void ServerProfileTable::follow(
     followed.followers.insert(follower_username);
 }
 
-std::optional<PendingNotif> ServerProfileTable::read_pending_notif(
+void ServerProfileTable::notify(
+    Address client,
+    NotifMessage message,
+    int64_t timestamp
+)
+{
+    std::unique_lock lock(this->control_mutex);
+
+    auto sender_sesssion_node = this->sessions.find(client);
+    if (sender_sesssion_node == this->sessions.end()) {
+        throw ThrowableMessageError(MSG_NO_CONNECTION);
+    }
+
+    Username const& sender_username = std::get<1>(*sender_sesssion_node);
+
+    auto sender_node = this->profiles.find(sender_username);
+    if (sender_node == this->profiles.end()) {
+        throw ThrowableMessageError(MSG_UNKNOWN_USERNAME);
+    }
+
+    Profile& sender = std::get<1>(*sender_node);
+    sender.notif_counter++;
+    Notification notif;
+    notif.id = sender.notif_counter;
+    notif.message = message;
+    notif.pending_count = sender.followers.size();
+
+    sender.received_notifs.insert(std::make_pair(notif.id, notif));
+
+    for (auto const& follower_username : sender.followers) {
+        auto followed_node = this->profiles.find(follower_username);
+        if (followed_node == this->profiles.end()) {
+            throw ThrowableMessageError(MSG_UNKNOWN_USERNAME);
+        }
+        Profile& follower = std::get<1>(*followed_node);
+        follower.pending_notifs.push_back(std::make_pair(
+            sender_username,
+            notif.id
+        ));
+    }
+
+}
+
+std::optional<PendingNotif> ServerProfileTable::consume_one_notif(
     Username username
 )
 {
