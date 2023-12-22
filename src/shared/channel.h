@@ -57,6 +57,8 @@ class Channel {
                 std::optional<T> try_receive();
 
                 T receive();
+
+                void disconnect();
         };
 
     public:
@@ -79,6 +81,8 @@ class Channel {
                 bool is_connected();
 
                 void send(T message);
+
+                void disconnect();
 
             private:
                 void connected();
@@ -106,6 +110,8 @@ class Channel {
                 std::optional<T> try_receive();
 
                 T receive();
+
+                void disconnect();
 
             private:
                 void connected();
@@ -135,7 +141,9 @@ template <typename T>
 void Channel<T>::Inner::sender_disconnected()
 {
     std::unique_lock lock(this->mutex);
-    this->senders--;
+    if (this->receivers > 0) {
+        this->senders--;
+    }
     if (this->senders == 0) {
         this->cond_var.notify_all();
     }
@@ -152,7 +160,11 @@ template <typename T>
 void Channel<T>::Inner::receiver_disconnected()
 {
     std::unique_lock lock(this->mutex);
-    this->receivers--;
+    if (this->receivers > 0) {
+        this->receivers--;
+    } else {
+        this->cond_var.notify_all();
+    }
 }
 
 template <typename T>
@@ -160,6 +172,15 @@ bool Channel<T>::Inner::is_connected()
 {
     std::unique_lock lock(this->mutex);
     return this->senders > 0 && this->receivers > 0;
+}
+
+template <typename T>
+void Channel<T>::Inner::disconnect()
+{
+    std::unique_lock lock(this->mutex);
+    this->receivers = 0;
+    this->senders = 0;
+    this->cond_var.notify_all();
 }
 
 template <typename T>
@@ -256,6 +277,15 @@ bool Channel<T>::Sender::is_connected()
         throw UsageOfMovedChannel();
     }
     return this->inner->is_connected();
+}
+
+template <typename T>
+void Channel<T>::Sender::disconnect()
+{
+    if (!this->inner) {
+        throw UsageOfMovedChannel();
+    }
+    this->inner->disconnect();
 }
 
 template <typename T>
@@ -370,6 +400,15 @@ void Channel<T>::Receiver::disconnected()
     if (this->inner) {
         this->inner->receiver_disconnected();
     }
+}
+
+template <typename T>
+void Channel<T>::Receiver::disconnect()
+{
+    if (!this->inner) {
+        throw UsageOfMovedChannel();
+    }
+    this->inner->disconnect();
 }
 
 template <typename T>

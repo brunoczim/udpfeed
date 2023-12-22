@@ -14,23 +14,27 @@ class Serializable;
 class Deserializable;
 
 class SerializationError : public std::exception {
-    private:
+    protected:
         std::string message;
 
     public:
         SerializationError(std::string const& message);
 
         virtual const char *what() const noexcept;
+
+        virtual ~SerializationError();
 };
 
 class DeserializationError : public std::exception {
-    private:
+    protected:
         std::string message;
 
     public:
         DeserializationError(std::string const& message);
 
         virtual const char *what() const noexcept;
+
+        virtual ~DeserializationError();
 };
 
 class DeserializationUnexpectedEof : public DeserializationError {

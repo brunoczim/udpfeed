@@ -9,8 +9,8 @@ InvalidNotifMessage::InvalidNotifMessage(
     std::string const& content,
     std::string const& why
 ) :
-    content_("\""),
-    message(content)
+    DeserializationError("\""),
+    content_(content)
 {
     this->message += content;
     this->message += "\": ";
@@ -20,11 +20,6 @@ InvalidNotifMessage::InvalidNotifMessage(
 std::string const& InvalidNotifMessage::content() const
 {
     return this->content_;
-}
-
-char const *InvalidNotifMessage::what() const noexcept
-{
-    return this->message.c_str();
 }
 
 NotifMessage::NotifMessage()

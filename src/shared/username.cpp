@@ -11,8 +11,8 @@ InvalidUsername::InvalidUsername(
     std::string const& content,
     std::string const& why
 ) :
-    content_("\""),
-    message(content)
+    DeserializationError("\""),
+    content_(content)
 {
     this->message += content;
     this->message += "\": ";
@@ -22,11 +22,6 @@ InvalidUsername::InvalidUsername(
 std::string const& InvalidUsername::content() const
 {
     return this->content_;
-}
-
-char const *InvalidUsername::what() const noexcept
-{
-    return this->message.c_str();
 }
 
 Username::Username()

@@ -11,17 +11,14 @@ class UninitializedUsername : public std::exception {
         virtual char const *what() const noexcept;
 };
 
-class InvalidUsername : public std::exception {
+class InvalidUsername : DeserializationError {
     private:
         std::string content_;
-        std::string message;
 
     public:
         InvalidUsername(std::string const& content, std::string const& why);
 
         std::string const& content() const;
-
-        virtual char const *what() const noexcept;
 };
 
 class Username : public Serializable, public Deserializable {

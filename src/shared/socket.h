@@ -165,6 +165,7 @@ class ReliableSocket {
                 Socket udp;
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
+
                 Channel<Enveloped>::Receiver handler_to_req_receiver;
 
                 std::mutex net_control_mutex;

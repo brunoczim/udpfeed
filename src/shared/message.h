@@ -15,37 +15,44 @@ class MessageOutOfProtocol : public std::exception {
         virtual const char *what() const noexcept;
 };
 
-class InvalidMessagePayload: public std::exception {
-    private:
-        std::string error_message;
+class InvalidMessagePayload : public DeserializationError {
     public:
         InvalidMessagePayload(std::string const& error_message);
-
-        virtual const char *what() const noexcept;
 };
 
 enum MessageError {
-    MSG_OK,
     MSG_INTERNAL_ERR,
     MSG_NO_CONNECTION,
     MSG_OUTDATED_SEQN,
-    MSG_BAD_USERNAME,
+    MSG_UNKNOWN_USERNAME,
     MSG_TOO_MANY_SESSIONS
 };
 
-class InvalidMessageError : public std::exception {
+class ThrowableMessageError : public std::exception {
     private:
-        std::string message;
+        MessageError error_;
+
+    public:
+        ThrowableMessageError(MessageError error);
+
+        MessageError error() const;
+
+        virtual char const *what() const noexcept;
+};
+
+
+class InvalidMessageError : public DeserializationError {
+    private:
         uint16_t code_;
     public:
         InvalidMessageError(uint16_t code);
 
         uint16_t code() const;
-
-        virtual const char *what() const noexcept;
 };
 
-MessageError msg_status_from_code(uint16_t code);
+MessageError msg_error_from_code(uint16_t code);
+
+char const *msg_error_render(MessageError error);
 
 Serializer& operator<<(Serializer& serializer, MessageError status);
 Deserializer& operator>>(Deserializer& deserializer, MessageError& status);
@@ -55,16 +62,13 @@ enum MessageStep {
     MSG_RESP
 };
 
-class InvalidMessageStep : public std::exception {
+class InvalidMessageStep : public DeserializationError {
     private:
-        std::string message;
         uint16_t code_;
     public:
         InvalidMessageStep(uint16_t code);
 
         uint16_t code() const;
-
-        virtual const char *what() const noexcept;
 };
 
 MessageStep msg_step_from_code(uint16_t code);
@@ -80,16 +84,13 @@ enum MessageType {
     MSG_NOTIFY
 };
 
-class InvalidMessageType : public std::exception {
+class InvalidMessageType : public DeserializationError {
     private:
-        std::string message;
         uint16_t code_;
     public:
         InvalidMessageType(uint16_t code);
 
         uint16_t code() const;
-
-        virtual const char *what() const noexcept;
 };
 
 MessageType msg_type_from_code(uint16_t code);

@@ -525,7 +525,7 @@ void ReliableSocket::Inner::bump()
 
 void ReliableSocket::Inner::disconnect()
 {
-    auto closed_ = std::move(this->handler_to_req_receiver);
+    this->handler_to_req_receiver.disconnect();
 }
 
 ReliableSocket::Config::Config() :
@@ -666,8 +666,20 @@ ReliableSocket::ReliableSocket(
         channel = std::move(input_to_handler_channel.sender)
     ] () mutable {
         try {
-            while (auto enveloped = inner->receive_raw(poll_timeout_ms)) {
-                channel.send(*enveloped);
+            bool connected = true;
+            while (connected) {
+                try {
+                    if (auto enveloped = inner->receive_raw(poll_timeout_ms)) {
+                        channel.send(*enveloped); 
+                    } else {
+                        connected = false;
+                    }
+                } catch (DeserializationError const& exc) {
+                    std::cerr
+                        << "failed to deserialize a packet: "
+                        << exc.what()
+                        << std::endl;
+                }
             }
         } catch (ChannelDisconnected const& exc) {
         }

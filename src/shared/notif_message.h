@@ -11,17 +11,14 @@ class UninitializedNotifMessage : public std::exception {
         virtual char const *what() const noexcept;
 };
 
-class InvalidNotifMessage : public std::exception {
+class InvalidNotifMessage : public DeserializationError {
     private:
         std::string content_;
-        std::string message;
 
     public:
         InvalidNotifMessage(std::string const& content, std::string const& why);
 
         std::string const& content() const;
-
-        virtual char const *what() const noexcept;
 };
 
 class NotifMessage : public Serializable, public Deserializable {
