@@ -24,6 +24,8 @@ class InvalidMessagePayload : public DeserializationError {
 
 enum MessageError {
     MSG_INTERNAL_ERR,
+    MSG_BAD,
+    MSG_MISSED_RESP,
     MSG_NO_CONNECTION,
     MSG_OUTDATED_SEQN,
     MSG_UNKNOWN_USERNAME,
@@ -83,7 +85,8 @@ enum MessageType {
     MSG_CONNECT,
     MSG_DISCONNECT,
     MSG_FOLLOW,
-    MSG_NOTIFY
+    MSG_NOTIFY,
+    MSG_DELIVER
 };
 
 class InvalidMessageType : public DeserializationError {
@@ -232,11 +235,10 @@ class MessageFollowResp : public MessageBody {
 
 class MessageNotifyReq : public MessageBody {
     public:
-        Username sender;
         NotifMessage notif_message;
 
         MessageNotifyReq();
-        MessageNotifyReq(Username const& sender, NotifMessage const& notif_msg);
+        MessageNotifyReq(NotifMessage const& notif_msg);
 
         virtual MessageTag tag() const;
 
@@ -245,6 +247,31 @@ class MessageNotifyReq : public MessageBody {
 };
 
 class MessageNotifyResp : public MessageBody {
+    public:
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageDeliverReq : public MessageBody {
+    public:
+        Username sender;
+        NotifMessage notif_message;
+
+        MessageDeliverReq();
+        MessageDeliverReq(
+            Username const& sender,
+            NotifMessage const& notif_msg
+        );
+
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageDeliverResp : public MessageBody {
     public:
         virtual MessageTag tag() const;
 

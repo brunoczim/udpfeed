@@ -9,6 +9,7 @@
 #include "../shared/tracker.h"
 #include "../shared/username.h"
 #include "../shared/notif_message.h"
+#include "../shared/string_ext.h"
 
 static TestSuite parse_udp_port_test_suite();
 static TestSuite plaintext_ser_test_suite();
@@ -19,6 +20,7 @@ static TestSuite reliable_socket_test_suite();
 static TestSuite thread_tracker_test_suite();
 static TestSuite username_test_suite();
 static TestSuite notif_message_test_suite();
+static TestSuite string_ext_test_suite();
 
 TestSuite shared_test_suite()
 {
@@ -32,6 +34,7 @@ TestSuite shared_test_suite()
         .append(thread_tracker_test_suite())
         .append(username_test_suite())
         .append(notif_message_test_suite())
+        .append(string_ext_test_suite())
     ;
 }
 
@@ -1000,6 +1003,111 @@ static TestSuite notif_message_test_suite()
                 thrown = true;
             }
             TEST_ASSERT("should have thrown", thrown);
+        })
+    ;
+}
+
+static TestSuite string_ext_test_suite()
+{
+    return TestSuite()
+        .test("trim nothing", [] () {
+            std::string target = "a bc";
+            std::string trimmed = trim_spaces(target);
+
+            TEST_ASSERT(
+                "found: " + trimmed,
+                trimmed == "a bc"
+            );
+        })
+
+        .test("trim only start", [] () {
+            std::string target = "  a bc";
+            std::string trimmed = trim_spaces(target);
+
+            TEST_ASSERT(
+                "found: " + trimmed,
+                trimmed == "a bc"
+            );
+        })
+
+        .test("trim only end", [] () {
+            std::string target = "a bc   ";
+            std::string trimmed = trim_spaces(target);
+
+            TEST_ASSERT(
+                "found: " + trimmed,
+                trimmed == "a bc"
+            );
+        })
+
+        .test("trim start and end", [] () {
+            std::string target = "  a bc   ";
+            std::string trimmed = trim_spaces(target);
+
+            TEST_ASSERT(
+                "found: " + trimmed,
+                trimmed == "a bc"
+            );
+        })
+
+        .test("trim empty", [] () {
+            std::string target = "  ";
+            std::string trimmed = trim_spaces(target);
+
+            TEST_ASSERT(
+                "found: " + trimmed,
+                trimmed == ""
+            );
+        })
+
+        .test("starts with is true, superstring", [] () {
+            std::string haystack = "Hey, John!";
+            std::string needle = "HeY";
+
+            TEST_ASSERT(
+                "should start with",
+                string_starts_with_ignore_case(haystack, needle)
+            );
+        })
+
+        .test("starts with is true, equals", [] () {
+            std::string haystack = "Hey";
+            std::string needle = "hey";
+
+            TEST_ASSERT(
+                "should start with",
+                string_starts_with_ignore_case(haystack, needle)
+            );
+        })
+
+        .test("starts with is false, superstring", [] () {
+            std::string haystack = "Hey, John!";
+            std::string needle = "Hea";
+
+            TEST_ASSERT(
+                "should not start with",
+                !string_starts_with_ignore_case(haystack, needle)
+            );
+        })
+
+        .test("starts with is false, equals", [] () {
+            std::string haystack = "Hey";
+            std::string needle = "jey";
+
+            TEST_ASSERT(
+                "should not start with",
+                !string_starts_with_ignore_case(haystack, needle)
+            );
+        })
+
+        .test("starts with is false, substring", [] () {
+            std::string haystack = "He";
+            std::string needle = "Hey";
+
+            TEST_ASSERT(
+                "should not start with",
+                !string_starts_with_ignore_case(haystack, needle)
+            );
         })
     ;
 }

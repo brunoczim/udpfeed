@@ -52,9 +52,15 @@ void start_server_communication_manager(
                 switch (req.req_enveloped().message.body->tag().type) {
                     case MSG_ERROR:
                         std::cerr
-                            << "warning, received bad error request"
+                            << "warning: received bad error request"
                             << std::endl;
-                            break;
+                        break;
+
+                    case MSG_DELIVER:
+                        std::cerr
+                            << "warning: received bad deliver request"
+                            << std::endl;
+                        break;
 
                     case MSG_CONNECT:
                     case MSG_DISCONNECT:

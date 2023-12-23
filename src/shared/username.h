@@ -11,7 +11,7 @@ class UninitializedUsername : public std::exception {
         virtual char const *what() const noexcept;
 };
 
-class InvalidUsername : DeserializationError {
+class InvalidUsername : public DeserializationError {
     private:
         std::string content_;
 
