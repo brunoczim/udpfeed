@@ -5,7 +5,7 @@
 void start_client_interface(
     ThreadTracker& thread_tracker,
     Channel<std::shared_ptr<ClientInputCommand>>::Sender&& to_session_man,
-    Channel<std::shared_ptr<ClientOutputNotice>>::Receiver&& from_comm_man
+    Channel<std::shared_ptr<ClientOutputNotice>>::Receiver&& from_session_man
 )
 {
     thread_tracker.spawn([
@@ -50,12 +50,12 @@ void start_client_interface(
     });
 
     thread_tracker.spawn([
-        from_comm_man = std::move(from_comm_man)
+        from_session_man = std::move(from_session_man)
     ] () mutable {
         try {
             for (;;) {
                 std::shared_ptr<ClientOutputNotice> notice =
-                    from_comm_man.receive();
+                    from_session_man.receive();
 
                 switch (notice->type()) {
                     case ClientOutputNotice::NOTIF: {

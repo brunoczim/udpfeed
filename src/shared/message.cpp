@@ -118,6 +118,7 @@ MessageError msg_error_from_code(uint16_t code)
 {
     switch (code) {
         case MSG_INTERNAL_ERR: return MSG_INTERNAL_ERR;
+        case MSG_MISSED_RESP: return MSG_MISSED_RESP;
         case MSG_NO_CONNECTION: return MSG_NO_CONNECTION;
         case MSG_OUTDATED_SEQN: return MSG_OUTDATED_SEQN;
         case MSG_UNKNOWN_USERNAME: return MSG_UNKNOWN_USERNAME;
@@ -130,6 +131,7 @@ char const *msg_error_render(MessageError error)
 {
     switch (error) {
         case MSG_INTERNAL_ERR: return "internal error";
+        case MSG_MISSED_RESP: return "missed message response";
         case MSG_NO_CONNECTION: return "no connection estabilished";
         case MSG_OUTDATED_SEQN: return "message sequence number is outdated";
         case MSG_UNKNOWN_USERNAME: return "given username is unknown";
@@ -398,11 +400,7 @@ MessageNotifyReq::MessageNotifyReq()
 {
 }
 
-MessageNotifyReq::MessageNotifyReq(
-    Username const& sender,
-    NotifMessage const& notif_msg
-) :
-    sender(sender),
+MessageNotifyReq::MessageNotifyReq(NotifMessage const& notif_msg) :
     notif_message(notif_msg)
 {
 }
@@ -414,12 +412,12 @@ MessageTag MessageNotifyReq::tag() const
 
 void MessageNotifyReq::serialize(Serializer& serializer) const
 {
-    serializer << this->sender << this->notif_message;
+    serializer << this->notif_message;
 }
 
 void MessageNotifyReq::deserialize(Deserializer& deserializer)
 {
-    deserializer >> this->sender >> this->notif_message;
+    deserializer >> this->notif_message;
 }
 
 MessageTag MessageNotifyResp::tag() const
@@ -432,6 +430,47 @@ void MessageNotifyResp::serialize(Serializer& serializer) const
 }
 
 void MessageNotifyResp::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageDeliverReq::MessageDeliverReq()
+{
+}
+
+MessageDeliverReq::MessageDeliverReq(
+    Username const& sender,
+    NotifMessage const& notif_msg
+) :
+    sender(sender),
+    notif_message(notif_msg)
+{
+}
+
+MessageTag MessageDeliverReq::tag() const
+{
+    return MessageTag(MSG_REQ, MSG_DELIVER);
+}
+
+void MessageDeliverReq::serialize(Serializer& serializer) const
+{
+    serializer << this->sender << this->notif_message;
+}
+
+void MessageDeliverReq::deserialize(Deserializer& deserializer)
+{
+    deserializer >> this->sender >> this->notif_message;
+}
+
+MessageTag MessageDeliverResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_DELIVER);
+}
+
+void MessageDeliverResp::serialize(Serializer& serializer) const
+{
+}
+
+void MessageDeliverResp::deserialize(Deserializer& deserializer)
 {
 }
 

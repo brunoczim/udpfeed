@@ -2,8 +2,9 @@
 #include <cstdlib>
 #include <string>
 #include <iostream>
-#include "username.h"
-#include "comm_manager.h"
+#include "../shared/username.h"
+#include "session_manager.h"
+#include "interface.h"
 
 struct Arguments {
     Username username;

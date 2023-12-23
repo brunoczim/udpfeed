@@ -247,7 +247,7 @@ char const *MissedResponse::what() const noexcept
 ReliableSocket::PendingResponse::PendingResponse(
     Enveloped enveloped,
     uint64_t max_req_attempts,
-    Channel<Enveloped>::Sender&& callback
+    std::optional<Channel<Enveloped>::Sender>&& callback
 ) :
     request(enveloped),
     cooldown_exp(1),
@@ -269,7 +269,8 @@ ReliableSocket::Connection::Connection(
     max_req_attemtps(max_req_attemtps),
     max_cached_sent_resps(max_cached_sent_resps),
     min_accepted_req_seqn(0),
-    remote_address(connect_request.remote)
+    remote_address(connect_request.remote),
+    disconnecting(false)
 {
 }
 
@@ -297,7 +298,7 @@ bool ReliableSocket::Inner::is_connected()
 
 void ReliableSocket::Inner::send_req(
     Enveloped enveloped,
-    Channel<Enveloped>::Sender&& callback
+    std::optional<Channel<Enveloped>::Sender>&& callback
 )
 {
     if (enveloped.message.body->tag().step != MSG_REQ) {
@@ -306,6 +307,14 @@ void ReliableSocket::Inner::send_req(
 
     std::unique_lock lock(this->net_control_mutex);
 
+    this->unsafe_send_req(enveloped, std::move(callback));
+}
+
+void ReliableSocket::Inner::unsafe_send_req(
+    Enveloped enveloped,
+    std::optional<Channel<Enveloped>::Sender>&& callback
+)
+{
     enveloped.message.header.fill_req();
 
     if (enveloped.message.body->tag().type == MSG_CONNECT) { 
@@ -318,12 +327,24 @@ void ReliableSocket::Inner::send_req(
 
     Connection& connection = this->connections[enveloped.remote];
 
-    connection.pending_responses.insert(std::make_pair(
-        enveloped.message.header.seqn, 
-        PendingResponse(enveloped, this->max_req_attempts, std::move(callback))
-    ));
+    bool was_disconnecting = false;
+    if (enveloped.message.body->tag().type == MSG_DISCONNECT) {
+        was_disconnecting = connection.disconnecting;
+        connection.disconnecting = true;
+    }
 
-    this->udp.send(enveloped);
+    if (!was_disconnecting || callback.has_value()) {
+        connection.pending_responses.insert(std::make_pair(
+            enveloped.message.header.seqn, 
+            PendingResponse(
+                enveloped,
+                this->max_req_attempts,
+                std::move(callback)
+            )
+        ));
+
+        this->udp.send(enveloped);
+    }
 }
 
 void ReliableSocket::Inner::send_resp(Enveloped enveloped)
@@ -468,7 +489,9 @@ void ReliableSocket::Inner::unsafe_handle_resp(Enveloped enveloped)
             enveloped.message.header.seqn
         )) {
             PendingResponse pending = pending_node.mapped();
-            pending.callback.send(enveloped);
+            if (pending.callback.has_value()) {
+                pending.callback->send(enveloped);
+            }
         }
     }
     if (enveloped.message.body->tag().type == MSG_DISCONNECT) {
@@ -526,6 +549,21 @@ void ReliableSocket::Inner::bump()
 void ReliableSocket::Inner::disconnect()
 {
     this->handler_to_req_receiver.disconnect();
+
+    std::unique_lock lock(this->net_control_mutex);
+
+    Enveloped disconnect_req;
+    disconnect_req.message.body = std::shared_ptr<MessageBody>(
+        new MessageDisconnectReq
+    );
+    for (auto& conn_entry : this->connections) {
+        Address address = std::get<0>(conn_entry);
+        disconnect_req.remote = address;
+        this->unsafe_send_req(
+            disconnect_req,
+            std::optional<Channel<Enveloped>::Sender>()
+        );
+    }
 }
 
 ReliableSocket::Config::Config() :
@@ -626,9 +664,7 @@ ReliableSocket::DisconnectGuard::DisconnectGuard(
 
 ReliableSocket::DisconnectGuard::~DisconnectGuard()
 {
-    if (this->socket) {
-        auto closed_ = std::move(*this->socket);
-    }
+    this->socket->disconnect();
 }
 
 ReliableSocket const& ReliableSocket::DisconnectGuard::operator*() const
@@ -782,7 +818,10 @@ void ReliableSocket::close()
 ReliableSocket::SentReq ReliableSocket::send_req(Enveloped enveloped)
 {
     Channel<Enveloped> channel;
-    this->inner->send_req(enveloped, std::move(channel.sender));
+    this->inner->send_req(
+        enveloped,
+        std::make_optional(std::move(channel.sender))
+    );
     return ReliableSocket::SentReq(enveloped, std::move(channel.receiver));
 }
 
@@ -790,4 +829,9 @@ ReliableSocket::ReceivedReq ReliableSocket::receive_req()
 {
     Enveloped req_enveloped = this->inner->receive();
     return ReliableSocket::ReceivedReq(this->inner, req_enveloped);
+}
+
+void ReliableSocket::disconnect()
+{
+    this->inner->disconnect();
 }

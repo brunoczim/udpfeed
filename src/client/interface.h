@@ -7,7 +7,7 @@
 void start_client_interface(
     ThreadTracker& thread_tracker,
     Channel<std::shared_ptr<ClientInputCommand>>::Sender&& to_session_man,
-    Channel<std::shared_ptr<ClientOutputNotice>>::Receiver&& from_comm_man
+    Channel<std::shared_ptr<ClientOutputNotice>>::Receiver&& from_session_man 
 );
 
 #endif

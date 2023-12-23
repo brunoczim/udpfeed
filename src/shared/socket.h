@@ -132,18 +132,19 @@ class ReliableSocket {
                 uint8_t cooldown_exp;
                 uint64_t cooldown_counter;
                 uint64_t remaining_attempts;
-                Channel<Enveloped>::Sender callback;
+                std::optional<Channel<Enveloped>::Sender> callback;
 
                 PendingResponse(
                     Enveloped enveloped,
                     uint64_t max_req_attempts,
-                    Channel<Enveloped>::Sender&& callback
+                    std::optional<Channel<Enveloped>::Sender>&& callback
                 );
         };
 
         class Connection {
             public:
                 Address remote_address;
+                bool disconnecting;
                 uint64_t max_req_attemtps;
                 uint64_t max_cached_sent_resps;
                 uint64_t min_accepted_req_seqn;
@@ -183,7 +184,12 @@ class ReliableSocket {
 
                 void send_req(
                     Enveloped enveloped,
-                    Channel<Enveloped>::Sender&& callback
+                    std::optional<Channel<Enveloped>::Sender>&& callback
+                );
+
+                void unsafe_send_req(
+                    Enveloped enveloped,
+                    std::optional<Channel<Enveloped>::Sender>&& callback
                 );
 
                 void send_resp(Enveloped enveloped);
@@ -307,6 +313,8 @@ class ReliableSocket {
 
         SentReq send_req(Enveloped message);
         ReceivedReq receive_req();
+
+        void disconnect();
 };
 
 #endif
