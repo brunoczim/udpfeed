@@ -2,10 +2,11 @@
 #include <cstdlib>
 #include <string>
 #include <iostream>
-#include "communication.h"
+#include "username.h"
+#include "comm_manager.h"
 
 struct Arguments {
-    std::string username;
+    Username username;
     std::string server_address;
     uint16_t server_port;
 };
@@ -17,6 +18,10 @@ Arguments parse_arguments(int argc, char const *argv[]);
 int main(int argc, char const *argv[])
 {
     Arguments arguments = parse_arguments(argc, argv);
+
+    Socket udp(1024);
+    ReliableSocket socket(std::move(udp));
+
     return 0;
 }
 
@@ -34,18 +39,22 @@ Arguments parse_arguments(int argc, char const *argv[])
         print_help();
         exit(1);
     }
-    arguments.username = argv[1];
+
+    try {
+        arguments.username = Username(argv[1]);
+    } catch (InvalidUsername const& exception) {
+        std::cerr << exception.what() << std::endl;
+        exit(1);
+    }
+
     arguments.server_address = argv[2];
+
     try {
         arguments.server_port = parse_udp_port(argv[3]);
     } catch (InvalidUdpPort const& exception) {
         std::cerr << exception.what() << std::endl;
         exit(1);
     }
-
-    Socket udp(1024);
-    ReliableSocket socket(std::move(udp));
-    ClientCommunicationManager comm_manager(std::move(socket));
 
     return arguments;
 }

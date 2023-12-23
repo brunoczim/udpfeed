@@ -1,5 +1,5 @@
-#ifndef SERVER_COMMUNICATION_H_
-#define SERVER_COMMUNICATION_H_ 1
+#ifndef SERVER_COMM_MANAGER_H_
+#define SERVER_COMM_MANAGER_H_ 1
 
 #include "../shared/socket.h"
 #include "../shared/tracker.h"
