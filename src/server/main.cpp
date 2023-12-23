@@ -61,17 +61,11 @@ int main(int argc, char const *argv[])
         std::move(prof_to_notif_man.receiver)
     );
 
-    GracefulShutdown::set_action([
-        prof_receiver = std::move(prof_receiver),
-        comm_receiver = std::move(comm_receiver),
-        notif_receiver = std::move(notif_receiver)
-    ] () mutable {
-        prof_receiver.disconnect();
-        comm_receiver.disconnect();
-        notif_receiver.disconnect();
-    });
+    wait_for_graceful_shutdown();
 
-    GracefulShutdown guard_;
+    prof_receiver.disconnect();
+    comm_receiver.disconnect();
+    notif_receiver.disconnect();
 
     return 0;
 }

@@ -1,35 +1,38 @@
 #include "shutdown.h"
 #include <iostream>
 
-std::mutex GracefulShutdown::control_mutex;
-std::condition_variable GracefulShutdown::cond_var;
-std::atomic<GracefulShutdown::State> GracefulShutdown::state;
-std::shared_ptr<std::function<void ()>> GracefulShutdown::action;
+enum State {
+    STATE_UNSET,
+    STATE_SET,
+    STATE_EXITING
+};
 
-GracefulShutdown::~GracefulShutdown()
+static std::mutex control_mutex;
+static std::condition_variable cond_var;
+static std::atomic<State> state;
+
+static void signal_handler(int signal_code);
+
+void wait_for_graceful_shutdown()
 {
     using namespace std::chrono_literals;
 
-    std::unique_lock lock(GracefulShutdown::control_mutex);
-    while (GracefulShutdown::state.load() != GracefulShutdown::EXITING) {
+    std::unique_lock lock(control_mutex);
+    if (state.load() == STATE_UNSET) {
+        signal(SIGINT, signal_handler);
+        state.store(STATE_SET);
+    }
+
+    while (state.load() != STATE_EXITING) {
         if (std::cin.eof()) {
-            GracefulShutdown::shutdown();
+            state.store(STATE_EXITING);
         } else {
-            GracefulShutdown::cond_var.wait_for(lock, 10ms);
+            cond_var.wait_for(lock, 10ms);
         }
     }
 }
 
-void GracefulShutdown::shutdown()
+void signal_handler(int signal_code)
 {
-    GracefulShutdown::State previous =
-        GracefulShutdown::state.exchange(GracefulShutdown::EXITING);
-    if (previous != GracefulShutdown::EXITING) {
-        (*GracefulShutdown::action)();
-    }
-}
-
-void GracefulShutdown::signal_handler(int signal_code)
-{
-    shutdown();
+    state.store(STATE_EXITING);
 }
