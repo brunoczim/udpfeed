@@ -47,20 +47,20 @@ Socket::Socket(size_t max_message_size) : max_message_size(max_message_size)
     }
 }
 
-Socket::Socket(size_t max_message_size, uint16_t port) :
+Socket::Socket(Address bind_addr, size_t max_message_size) :
     Socket(max_message_size)
 {
-    struct sockaddr_in bind_addr;
+    struct sockaddr_in native_bind_addr;
 
-    bind_addr.sin_family = AF_INET;
-    bind_addr.sin_port = htons(port);
-    bind_addr.sin_addr.s_addr = INADDR_ANY;
-    bzero(&bind_addr.sin_zero, 8);
+    native_bind_addr.sin_family = AF_INET;
+    native_bind_addr.sin_port = htons(bind_addr.port);
+    native_bind_addr.sin_addr.s_addr = htonl(bind_addr.ipv4);
+    bzero(&native_bind_addr.sin_zero, 8);
 
     int status = bind(
         this->sockfd,
-        (struct sockaddr *) &bind_addr,
-        sizeof(bind_addr)
+        (struct sockaddr *) &native_bind_addr,
+        sizeof(native_bind_addr)
     );
     if (status < 0) {
         throw SocketIoError("socket bind");

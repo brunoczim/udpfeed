@@ -18,11 +18,26 @@ class InvalidUdpPort : public std::exception {
         virtual const char *what() const noexcept;
 };
 
+class InvalidIpv4 : public std::exception {
+    private:
+        std::string message;
+    public:
+        InvalidIpv4(char const *ipv4, std::string const& message);
+
+        virtual const char *what() const noexcept;
+};
+
 uint16_t parse_udp_port(char const *content);
 
 uint16_t parse_udp_port(std::string const& content);
 
+uint32_t parse_ipv4(char const *ipv4);
+
+uint32_t parse_ipv4(std::string const& content);
+
 uint32_t make_ipv4(std::array<uint8_t, 4> bytes);
+
+std::string ipv4_to_string(uint32_t ipv4);
 
 class Address {
     public:

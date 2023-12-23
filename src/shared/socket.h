@@ -42,7 +42,7 @@ class Socket {
 
     public:
         Socket(size_t max_message_size);
-        Socket(size_t max_message_size, uint16_t port);
+        Socket(Address bind_addr, size_t max_message_size);
         Socket(Socket&& other);
         Socket(Socket const& other) = delete;
         Socket& operator=(Socket const& obj) = delete;
