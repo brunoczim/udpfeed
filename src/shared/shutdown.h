@@ -8,6 +8,8 @@
 #include <memory>
 #include <condition_variable>
 
+void wait_for_graceful_shutdown();
+
 class GracefulShutdown {
     private:
         enum State {
