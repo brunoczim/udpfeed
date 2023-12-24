@@ -15,9 +15,13 @@ void start_client_interface(
         std::string follow_cmd = "FOLLOW";
         std::string send_cmd = "SEND";
         std::string line;
-        while (!std::cin.eof()) {
+        while (!std::cin.eof() && to_session_man.is_connected()) {
             bool has_chars = false;
-            while (!std::cin.eof() && !has_chars) {
+            while (
+                !std::cin.eof()
+                && to_session_man.is_connected()
+                && !has_chars
+            ) {
                 struct pollfd fds[1];
                 fds[0].fd = fileno(stdin);
                 fds[0].events = POLLIN;

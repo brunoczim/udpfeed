@@ -67,6 +67,7 @@ void start_client_session_manager(
         server_addr,
         socket
     ] () mutable {
+        ReliableSocket::DisconnectGuard raw_guard_(socket);
         try {
             Enveloped connect_req;
             connect_req.remote = server_addr;
