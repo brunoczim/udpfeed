@@ -1,6 +1,7 @@
 #include <iostream>
-#include "log.h"
+#include "../shared/log.h"
 #include "comm_manager.h"
+#include "../shared/shutdown.h"
 
 void start_server_communication_manager(
     ThreadTracker& thread_tracker,
@@ -27,9 +28,9 @@ void start_server_communication_manager(
                         socket->send_req(notif_enveloped);
                     Enveloped response = std::move(sent_req).receive_resp();
 
-                    response.message.body->cast<MessageNotifyResp>();
+                    response.message.body->cast<MessageDeliverResp>();
                 } catch (std::exception const& exc) {
-                    ServerLogger::with([&exc, &notif_enveloped] (auto& output) {
+                    Logger::with([&exc, &notif_enveloped] (auto& output) {
                         output
                             << "error notifying connection "
                             << notif_enveloped.remote.to_string()
@@ -41,6 +42,7 @@ void start_server_communication_manager(
             }
         } catch (ChannelDisconnected const& exc) {
         }
+        signal_graceful_shutdown();
     });
 
     thread_tracker.spawn([
@@ -54,7 +56,7 @@ void start_server_communication_manager(
                 ReliableSocket::ReceivedReq req = socket->receive_req();
                 switch (req.req_enveloped().message.body->tag().type) {
                     case MSG_ERROR:
-                        ServerLogger::with([] (auto& output) {
+                        Logger::with([] (auto& output) {
                             output
                                 << "warning: received bad error request"
                                 << std::endl;
@@ -62,7 +64,7 @@ void start_server_communication_manager(
                         break;
 
                     case MSG_DELIVER:
-                        ServerLogger::with([] (auto& output) {
+                        Logger::with([] (auto& output) {
                             output
                                 << "warning: received bad deliver request"
                                 << std::endl;
@@ -75,9 +77,10 @@ void start_server_communication_manager(
                     case MSG_NOTIFY:
                         to_profile_man.send(req);
                         break;
-                }
+                    }
             }
         } catch (ChannelDisconnected const& exc) {
         }
+        signal_graceful_shutdown();
     });
 }

@@ -4,6 +4,7 @@
 #include <iostream>
 #include "../shared/username.h"
 #include "../shared/shutdown.h"
+#include "../shared/log.h"
 #include "session_manager.h"
 #include "interface.h"
 
@@ -22,14 +23,18 @@ int main(int argc, char const *argv[])
 
     std::ios_base::sync_with_stdio();
 
-    std::cerr
-        << "Connecting to "
-        << arguments.server_address.to_string()
-        << " with username "
-        << arguments.username.content()
-        << std::endl
-        << "Press Ctrl-C or Ctrl-D to disconnect"
-        << std::endl;
+    Logger::set_output(&std::cerr);
+
+    Logger::with([&arguments] (auto& output) {
+        output
+            << "Connecting to "
+            << arguments.server_address.to_string()
+            << " with username "
+            << arguments.username.content()
+            << std::endl
+            << "Press Ctrl-C or Ctrl-D to disconnect"
+            << std::endl;
+    });
 
     ThreadTracker thread_tracker;
     Socket udp(1024);

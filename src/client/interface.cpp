@@ -2,6 +2,10 @@
 #include <poll.h>
 #include "interface.h"
 #include "../shared/string_ext.h"
+#include "../shared/log.h"
+#include "../shared/shutdown.h"
+
+static std::mutex stdout_mutex;
 
 void start_client_interface(
     ThreadTracker& thread_tracker,
@@ -12,8 +16,8 @@ void start_client_interface(
     thread_tracker.spawn([
         to_session_man = std::move(to_session_man)
     ] () mutable {
-        std::string follow_cmd = "FOLLOW";
-        std::string send_cmd = "SEND";
+        std::string follow_cmd = "FOLLOW ";
+        std::string send_cmd = "SEND ";
         std::string line;
         while (!std::cin.eof() && to_session_man.is_connected()) {
             bool has_chars = false;
@@ -50,22 +54,26 @@ void start_client_interface(
                     } else if (string_starts_with_ignore_case(line, send_cmd)) {
                         try {
                             NotifMessage message = trim_spaces(line.substr(
-                                follow_cmd.size(),
-                                line.size() - follow_cmd.size()
+                                send_cmd.size(),
+                                line.size() - send_cmd.size()
                             ));
                             to_session_man
                                 .send(std::shared_ptr<ClientInputCommand>(
                                     new ClientSendCommand(message)
                                 ));
                         } catch (InvalidNotifMessage const& exc) {
-                            std::cerr << exc.what() << std::endl;
+                            Logger::with([&exc] (auto& output) {
+                                output << exc.what() << std::endl;
+                            });
                         }
                     } else if (line != "") {
-                        std::cerr << "Unrecognized command." << std::endl;
+                        std::unique_lock lock(stdout_mutex);
+                        std::cout << "Unrecognized command." << std::endl;
                     }
                 }
             }
         }
+        signal_graceful_shutdown();
     });
 
     thread_tracker.spawn([
@@ -78,6 +86,7 @@ void start_client_interface(
 
                 switch (notice->type()) {
                     case ClientOutputNotice::NOTIF: {
+                        std::unique_lock lock(stdout_mutex);
                         ClientNotifNotice const& notif_notice =
                             dynamic_cast<ClientNotifNotice const&>(*notice);
                         std::cout
@@ -90,10 +99,13 @@ void start_client_interface(
                     case ClientOutputNotice::ERROR: {
                         ClientErrorNotice const& error_notice =
                             dynamic_cast<ClientErrorNotice const&>(*notice);
-                        std::cerr
-                            << "recent UDP message resulted in error: "
-                            << msg_error_render(error_notice.error)
-                            << std::endl;
+
+                        Logger::with([&error_notice] (auto& output) {
+                            output
+                                << "recent UDP message resulted in error: "
+                                << msg_error_render(error_notice.error)
+                                << std::endl;
+                        });
                         break;
                     }
                 }

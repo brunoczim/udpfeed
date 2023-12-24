@@ -1,4 +1,6 @@
 #include "session_manager.h"
+#include "../shared/log.h"
+#include "../shared/shutdown.h"
 
 ClientSessionManDisconnectGuard::ClientSessionManDisconnectGuard(
     Address server_addr,
@@ -131,6 +133,9 @@ void start_client_session_manager(
                 }
             }
         } catch (MissedResponse const& exc) {
+            Logger::with([] (auto& output) {
+                output << "!! Failed to connect !!" << std::endl;
+            });
             try {
                 to_interface.send(std::shared_ptr<ClientOutputNotice>(
                     new ClientErrorNotice(MSG_MISSED_RESP)
@@ -139,6 +144,9 @@ void start_client_session_manager(
             }
         } catch (ChannelDisconnected const& exc) {
         } catch (CastOnMessageError const& exc) {
+            Logger::with([] (auto& output) {
+                output << "!! Failed to connect !!" << std::endl;
+            });
             try {
                 to_interface.send(std::shared_ptr<ClientOutputNotice>(
                     new ClientErrorNotice(exc.error())
@@ -146,6 +154,9 @@ void start_client_session_manager(
             } catch (ChannelDisconnected const& exc) {
             }
         }
+        from_interface.disconnect();
+        to_interface.disconnect();
+        signal_graceful_shutdown();
     });
 
     thread_tracker.spawn([
@@ -214,5 +225,6 @@ void start_client_session_manager(
             }
         } catch (ChannelDisconnected const& exc) {
         }
+        signal_graceful_shutdown();
     });
 }

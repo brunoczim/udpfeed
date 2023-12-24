@@ -1,4 +1,6 @@
 #include "prof_manager.h"
+#include "../shared/log.h"
+#include "../shared/shutdown.h"
 
 char const *InvalidServerProfManMsg::what() const noexcept
 {
@@ -40,6 +42,16 @@ void start_server_profile_manager(
                                     new MessageConnectResp
                                 )
                             );
+                            Logger::with([
+                                &message,
+                                &req_enveloped
+                            ] (auto& output) {
+                                output << "Client "
+                                    << req_enveloped.remote.to_string()
+                                    << " connected with username "
+                                    << message.username.content()
+                                    << std::endl;
+                            });
                             break;
                         }
 
@@ -53,6 +65,14 @@ void start_server_profile_manager(
                                     new MessageDisconnectResp
                                 )
                             );
+                            Logger::with([
+                                &req_enveloped
+                            ] (auto& output) {
+                                output << "Client "
+                                    << req_enveloped.remote.to_string()
+                                    << " disconnected"
+                                    << std::endl;
+                            });
                             break;
 
                         case MSG_FOLLOW: {
@@ -70,6 +90,16 @@ void start_server_profile_manager(
                                     new MessageFollowResp
                                 )
                             );
+                            Logger::with([
+                                &message,
+                                &req_enveloped
+                            ] (auto& output) {
+                                output << "Client "
+                                    << req_enveloped.remote.to_string()
+                                    << " profile started following "
+                                    << message.username.content()
+                                    << std::endl;
+                            });
                             break;
                         }
 
@@ -89,6 +119,17 @@ void start_server_profile_manager(
                                     new MessageNotifyResp
                                 )
                             );
+                            Logger::with([
+                                &message,
+                                &req_enveloped
+                            ] (auto& output) {
+                                output << "Client "
+                                    << req_enveloped.remote.to_string()
+                                    << " sent notification with: "
+                                    << message.notif_message.content()
+                                    << std::endl;
+                            });
+                            break;
                         }
 
                         default:
@@ -102,5 +143,6 @@ void start_server_profile_manager(
             }
         } catch (ChannelDisconnected const& exc) {
         }
+        signal_graceful_shutdown();
     });
 }

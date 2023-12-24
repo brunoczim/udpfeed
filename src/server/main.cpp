@@ -7,7 +7,7 @@
 #include "prof_manager.h"
 #include "notif_manager.h"
 #include "../shared/shutdown.h"
-#include "log.h"
+#include "../shared/log.h"
 
 struct Arguments {
     Address bind_address;
@@ -23,11 +23,11 @@ int main(int argc, char const *argv[])
 
     std::ios_base::sync_with_stdio();
 
-    ServerLogger::set_output(&std::cerr);
+    Logger::set_output(&std::cerr);
 
     ThreadTracker thread_tracker;
 
-    ServerLogger::with([bind_address = arguments.bind_address] (auto& output) {
+    Logger::with([bind_address = arguments.bind_address] (auto& output) {
         output << "Binding to " << bind_address.to_string() << std::endl;
     });
 
@@ -47,7 +47,7 @@ int main(int argc, char const *argv[])
     Channel<Username>::Receiver notif_receiver =
         prof_to_notif_man.receiver;
 
-    ServerLogger::with([] (auto& output) {
+    Logger::with([] (auto& output) {
         output << "Starting communication manager" << std::endl;
     });
 
@@ -58,7 +58,7 @@ int main(int argc, char const *argv[])
         std::move(notif_to_comm_man.receiver)
     );
 
-    ServerLogger::with([] (auto& output) {
+    Logger::with([] (auto& output) {
         output << "Starting profile manager" << std::endl;
     });
 
@@ -69,7 +69,7 @@ int main(int argc, char const *argv[])
         std::move(comm_to_prof_man.receiver)
     );
 
-    ServerLogger::with([] (auto& output) {
+    Logger::with([] (auto& output) {
         output << "Starting notification manager" << std::endl;
     });
 
@@ -80,13 +80,13 @@ int main(int argc, char const *argv[])
         std::move(prof_to_notif_man.receiver)
     );
 
-    ServerLogger::with([] (auto& output) {
+    Logger::with([] (auto& output) {
         output << "Press Ctrl-C or Ctrl-D to shutdown" << std::endl;
     });
 
     wait_for_graceful_shutdown(SHUTDOWN_ACTIVE_EOF);
 
-    ServerLogger::with([] (auto& output) {
+    Logger::with([] (auto& output) {
         output << std::endl << "Shutting down..." << std::endl;
     });
 

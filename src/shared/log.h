@@ -1,17 +1,17 @@
-#ifndef SERVER_LOG_H_
-#define SERVER_LOG_H_ 1
+#ifndef SHARED_LOG_H_
+#define SHARED_LOG_H_ 1
 
 #include <mutex>
 #include <memory>
 #include <functional>
 
-class ServerLogger {
+class Logger {
     private:
         static std::mutex control_mutex;
         static std::ostream* output;
 
     public:
-        ServerLogger() = delete;
+        Logger() = delete;
 
         static void set_output(std::ostream* output);
 
@@ -21,12 +21,12 @@ class ServerLogger {
 
 
 template <typename F>
-void ServerLogger::with(F&& visitor)
+void Logger::with(F&& visitor)
 {
     std::function<void (std::ostream&)> visitor_function = std::move(visitor);
-    std::unique_lock lock(ServerLogger::control_mutex);
-    if (ServerLogger::output) {
-        visitor_function(*ServerLogger::output);
+    std::unique_lock lock(Logger::control_mutex);
+    if (Logger::output) {
+        visitor_function(*Logger::output);
     }
 }
 
