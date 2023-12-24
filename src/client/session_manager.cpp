@@ -44,7 +44,7 @@ ReliableSocket* ClientSessionManDisconnectGuard::operator->()
     return this->socket.operator->();
 }
 
-void start_client_communication_manager(
+void start_client_session_manager(
     ThreadTracker& thread_tracker,
     Username const& username,
     Address server_addr,
@@ -67,6 +67,7 @@ void start_client_communication_manager(
         server_addr,
         socket
     ] () mutable {
+        ReliableSocket::DisconnectGuard raw_guard_(socket);
         try {
             Enveloped connect_req;
             connect_req.remote = server_addr;
@@ -130,14 +131,20 @@ void start_client_communication_manager(
                 }
             }
         } catch (MissedResponse const& exc) {
-            to_interface.send(std::shared_ptr<ClientOutputNotice>(
-                new ClientErrorNotice(MSG_MISSED_RESP)
-            ));
+            try {
+                to_interface.send(std::shared_ptr<ClientOutputNotice>(
+                    new ClientErrorNotice(MSG_MISSED_RESP)
+                ));
+            } catch (ChannelDisconnected const& exc) {
+            }
         } catch (ChannelDisconnected const& exc) {
         } catch (CastOnMessageError const& exc) {
-            to_interface.send(std::shared_ptr<ClientOutputNotice>(
-                new ClientErrorNotice(exc.error())
-            ));
+            try {
+                to_interface.send(std::shared_ptr<ClientOutputNotice>(
+                    new ClientErrorNotice(exc.error())
+                ));
+            } catch (ChannelDisconnected const& exc) {
+            }
         }
     });
 

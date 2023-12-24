@@ -23,7 +23,7 @@ class ClientSessionManDisconnectGuard {
         ReliableSocket* operator->();
 };
 
-void start_client_communication_manager(
+void start_client_session_manager(
     ThreadTracker& thread_tracker,
     Username const& username,
     Address server_addr,

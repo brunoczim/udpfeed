@@ -1,4 +1,5 @@
 #include <iostream>
+#include "log.h"
 #include "comm_manager.h"
 
 void start_server_communication_manager(
@@ -28,12 +29,14 @@ void start_server_communication_manager(
 
                     response.message.body->cast<MessageNotifyResp>();
                 } catch (std::exception const& exc) {
-                    std::cerr
-                        << "error notifying connection "
-                        << notif_enveloped.remote.to_string()
-                        << " : "
-                        << exc.what()
-                        << std::endl;
+                    ServerLogger::with([&exc, &notif_enveloped] (auto& output) {
+                        output
+                            << "error notifying connection "
+                            << notif_enveloped.remote.to_string()
+                            << " : "
+                            << exc.what()
+                            << std::endl;
+                    });
                 }
             }
         } catch (ChannelDisconnected const& exc) {
@@ -51,15 +54,19 @@ void start_server_communication_manager(
                 ReliableSocket::ReceivedReq req = socket->receive_req();
                 switch (req.req_enveloped().message.body->tag().type) {
                     case MSG_ERROR:
-                        std::cerr
-                            << "warning: received bad error request"
-                            << std::endl;
+                        ServerLogger::with([] (auto& output) {
+                            output
+                                << "warning: received bad error request"
+                                << std::endl;
+                        });
                         break;
 
                     case MSG_DELIVER:
-                        std::cerr
-                            << "warning: received bad deliver request"
-                            << std::endl;
+                        ServerLogger::with([] (auto& output) {
+                            output
+                                << "warning: received bad deliver request"
+                                << std::endl;
+                        });
                         break;
 
                     case MSG_CONNECT:

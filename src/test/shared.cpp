@@ -12,6 +12,7 @@
 #include "../shared/string_ext.h"
 
 static TestSuite parse_udp_port_test_suite();
+static TestSuite parse_ipv4_test_suite();
 static TestSuite plaintext_ser_test_suite();
 static TestSuite plaintext_de_test_suite();
 static TestSuite socket_test_suite();
@@ -26,6 +27,7 @@ TestSuite shared_test_suite()
 {
     return TestSuite()
         .append(parse_udp_port_test_suite())
+        .append(parse_ipv4_test_suite())
         .append(plaintext_ser_test_suite())
         .append(plaintext_de_test_suite())
         .append(socket_test_suite())
@@ -96,6 +98,83 @@ static TestSuite parse_udp_port_test_suite()
             TEST_ASSERT(
                 std::string("should throw, but found ") + std::to_string(actual),
                 throwed
+            );
+        })
+    ;
+}
+
+static TestSuite parse_ipv4_test_suite()
+{
+    return TestSuite()
+        .test("parse_ipv4 valid local", [] {
+            uint32_t actual = parse_ipv4("192.168.15.132");
+            
+            TEST_ASSERT(
+                std::string("found ") + ipv4_to_string(actual),
+                ipv4_to_string(actual) == "192.168.15.132"
+            );
+        })
+
+        .test("parse_ipv4 valid spaced", [] {
+            uint32_t actual = parse_ipv4("  192 .168.15.    132 ");
+            
+            TEST_ASSERT(
+                std::string("found ") + ipv4_to_string(actual),
+                ipv4_to_string(actual) == "192.168.15.132"
+            );
+        })
+
+        .test("parse_ipv4 valid loopback", [] {
+            uint32_t actual = parse_ipv4("127.0.0.1");
+            
+            TEST_ASSERT(
+                std::string("found ") + ipv4_to_string(actual),
+                ipv4_to_string(actual) == "127.0.0.1"
+            );
+        })
+
+        .test("parse_ipv4 missing byte", [] {
+            bool thrown = false;
+            uint32_t actual = 0;
+            try {
+                actual = parse_ipv4("127.0.0.");
+            } catch (InvalidIpv4 const& exc) {
+                thrown = true;
+            }
+            
+            TEST_ASSERT(
+                std::string("should throw, but found ") + ipv4_to_string(actual),
+                thrown
+            );
+        })
+
+        .test("parse_ipv4 bad char", [] {
+            bool thrown = false;
+            uint32_t actual = 0;
+            try {
+                actual = parse_ipv4("127&0.0.1");
+            } catch (InvalidIpv4 const& exc) {
+                thrown = true;
+            }
+            
+            TEST_ASSERT(
+                std::string("should throw, but found ") + ipv4_to_string(actual),
+                thrown
+            );
+        })
+
+        .test("parse_ipv4 bad trailing chars", [] {
+            bool thrown = false;
+            uint32_t actual = 0;
+            try {
+                actual = parse_ipv4("127&0.0.1 .");
+            } catch (InvalidIpv4 const& exc) {
+                thrown = true;
+            }
+            
+            TEST_ASSERT(
+                std::string("should throw, but found ") + ipv4_to_string(actual),
+                thrown
             );
         })
     ;
@@ -418,7 +497,7 @@ static TestSuite socket_test_suite()
     return TestSuite()
         .test("basic send and receive", [] {
             Socket client(500);
-            Socket server(500, 8082);
+            Socket server(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
             Enveloped enveloped;
             enveloped.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             enveloped.message;
@@ -460,7 +539,7 @@ static TestSuite socket_test_suite()
 
         .test("full message workflow", [] {
             Socket client(500);
-            Socket server(500, 8082);
+            Socket server(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
 
             Enveloped request;
             request.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
@@ -659,7 +738,7 @@ static TestSuite reliable_socket_test_suite()
             Socket client_udp(500);
             ReliableSocket client(std::move(client_udp));
 
-            Socket server_udp(500, 8082);
+            Socket server_udp(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
             ReliableSocket server(std::move(server_udp));
 
             Enveloped conn_req;
@@ -722,7 +801,7 @@ static TestSuite reliable_socket_test_suite()
             Socket client_udp(500);
             ReliableSocket client(std::move(client_udp));
 
-            Socket server_udp(500, 8082);
+            Socket server_udp(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
             ReliableSocket server(std::move(server_udp));
 
             std::thread server_thread([server = std::move(server)] () mutable {
@@ -787,7 +866,7 @@ static TestSuite reliable_socket_test_suite()
         })
 
         .test("multi client, multi-threaded", [] {
-            Socket server_udp(500, 8082);
+            Socket server_udp(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
             ReliableSocket server(std::move(server_udp));
 
             constexpr size_t thread_count = 4;

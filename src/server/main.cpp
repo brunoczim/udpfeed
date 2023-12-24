@@ -7,10 +7,10 @@
 #include "prof_manager.h"
 #include "notif_manager.h"
 #include "../shared/shutdown.h"
+#include "log.h"
 
 struct Arguments {
-    std::string bind_address;
-    uint16_t bind_port;
+    Address bind_address;
 };
 
 void print_help(void);
@@ -21,9 +21,17 @@ int main(int argc, char const *argv[])
 {
     Arguments arguments = parse_arguments(argc, argv);
 
+    std::ios_base::sync_with_stdio();
+
+    ServerLogger::set_output(&std::cerr);
+
     ThreadTracker thread_tracker;
 
-    Socket udp(1024, arguments.bind_port);
+    ServerLogger::with([bind_address = arguments.bind_address] (auto& output) {
+        output << "Binding to " << bind_address.to_string() << std::endl;
+    });
+
+    Socket udp(arguments.bind_address, 1024);
     ReliableSocket socket(std::move(udp));
 
     std::shared_ptr<ServerProfileTable> profile_table(new ServerProfileTable);
@@ -39,6 +47,9 @@ int main(int argc, char const *argv[])
     Channel<Username>::Receiver notif_receiver =
         prof_to_notif_man.receiver;
 
+    ServerLogger::with([] (auto& output) {
+        output << "Starting communication manager" << std::endl;
+    });
 
     start_server_communication_manager(
         thread_tracker,
@@ -47,12 +58,20 @@ int main(int argc, char const *argv[])
         std::move(notif_to_comm_man.receiver)
     );
 
+    ServerLogger::with([] (auto& output) {
+        output << "Starting profile manager" << std::endl;
+    });
+
     start_server_profile_manager(
         thread_tracker,
         profile_table,
         std::move(prof_to_notif_man.sender),
         std::move(comm_to_prof_man.receiver)
     );
+
+    ServerLogger::with([] (auto& output) {
+        output << "Starting notification manager" << std::endl;
+    });
 
     start_server_notification_manager(
         thread_tracker,
@@ -61,7 +80,15 @@ int main(int argc, char const *argv[])
         std::move(prof_to_notif_man.receiver)
     );
 
-    wait_for_graceful_shutdown();
+    ServerLogger::with([] (auto& output) {
+        output << "Press Ctrl-C or Ctrl-D to shutdown" << std::endl;
+    });
+
+    wait_for_graceful_shutdown(SHUTDOWN_ACTIVE_EOF);
+
+    ServerLogger::with([] (auto& output) {
+        output << std::endl << "Shutting down..." << std::endl;
+    });
 
     prof_receiver.disconnect();
     comm_receiver.disconnect();
@@ -84,9 +111,16 @@ Arguments parse_arguments(int argc, char const *argv[])
         print_help();
         exit(1);
     }
-    arguments.bind_address = argv[1];
+
     try {
-        arguments.bind_port = parse_udp_port(argv[2]);
+        arguments.bind_address.ipv4 = parse_ipv4(argv[1]);
+    } catch (InvalidIpv4 const& exception) {
+        std::cerr << exception.what() << std::endl;
+        exit(1);
+    }
+
+    try {
+        arguments.bind_address.port = parse_udp_port(argv[2]);
     } catch (InvalidUdpPort const& exception) {
         std::cerr << exception.what() << std::endl;
         exit(1);
