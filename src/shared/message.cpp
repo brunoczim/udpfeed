@@ -434,16 +434,18 @@ void MessageNotifyResp::deserialize(Deserializer& deserializer)
 {
 }
 
-MessageDeliverReq::MessageDeliverReq()
+MessageDeliverReq::MessageDeliverReq() : sent_at(0)
 {
 }
 
 MessageDeliverReq::MessageDeliverReq(
     Username const& sender,
-    NotifMessage const& notif_msg
+    NotifMessage const& notif_msg,
+    int64_t sent_at
 ) :
     sender(sender),
-    notif_message(notif_msg)
+    notif_message(notif_msg),
+    sent_at(sent_at)
 {
 }
 
@@ -454,12 +456,12 @@ MessageTag MessageDeliverReq::tag() const
 
 void MessageDeliverReq::serialize(Serializer& serializer) const
 {
-    serializer << this->sender << this->notif_message;
+    serializer << this->sender << this->notif_message << this->sent_at;
 }
 
 void MessageDeliverReq::deserialize(Deserializer& deserializer)
 {
-    deserializer >> this->sender >> this->notif_message;
+    deserializer >> this->sender >> this->notif_message >> this->sent_at;
 }
 
 MessageTag MessageDeliverResp::tag() const

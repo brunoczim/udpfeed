@@ -21,7 +21,7 @@ int main(int argc, char const *argv[])
 {
     Arguments arguments = parse_arguments(argc, argv);
 
-    std::ios_base::sync_with_stdio();
+    std::ios::sync_with_stdio();
 
     Logger::set_output(&std::cerr);
 

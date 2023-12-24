@@ -17,6 +17,7 @@ class PendingNotif {
     public:
         Username sender;
         NotifMessage message;
+        int64_t sent_at;
         std::set<Address> receivers;
 };
 
@@ -26,9 +27,16 @@ class ServerProfileTable : public Serializable, public Deserializable {
             public:
                 uint64_t id;
                 NotifMessage message;
+                int64_t sent_at;
                 uint64_t pending_count;
 
                 Notification();
+                Notification(
+                    uint64_t id,
+                    NotifMessage message,
+                    int64_t timestamp,
+                    uint64_t pending_count
+                );
 
                 virtual void serialize(Serializer& stream) const;
                 virtual void deserialize(Deserializer& stream);
@@ -38,6 +46,7 @@ class ServerProfileTable : public Serializable, public Deserializable {
             public:
                 uint64_t notif_counter;
                 Username username;
+                int64_t created_at;
                 std::set<Username> followers;
                 std::map<uint64_t, Notification> received_notifs;
                 std::set<Address> sessions;
@@ -65,6 +74,7 @@ class ServerProfileTable : public Serializable, public Deserializable {
         void connect(
             Address client,
             Username const& profile,
+            Channel<Username>::Sender& followers_sender,
             int64_t timestamp
         );
 

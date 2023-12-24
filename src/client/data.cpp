@@ -2,10 +2,12 @@
 
 ClientNotifNotice::ClientNotifNotice(
     Username const& sender,
-    NotifMessage const& message
+    NotifMessage const& message,
+    int64_t sent_at
 ) :
     sender(sender),
-    message(message)
+    message(message),
+    sent_at(sent_at)
 {
 }
 
