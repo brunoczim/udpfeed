@@ -19,8 +19,13 @@ class ClientNotifNotice : public ClientOutputNotice {
     public:
         Username sender;
         NotifMessage message;
+        int64_t sent_at;
 
-        ClientNotifNotice(Username const& sender, NotifMessage const& message);
+        ClientNotifNotice(
+            Username const& sender,
+            NotifMessage const& message,
+            int64_t sent_at
+        );
 
         virtual ClientOutputNotice::Type type() const;
 };

@@ -66,17 +66,18 @@ Deserializer::Deserializer(std::istream& stream) : stream(stream)
 {
 }
 
-Deserializer& Deserializer::operator>>(Deserializable& data)
-{
-    data.deserialize(*this);
-    return *this;
-}
-
-void Deserializer::ensure_eof()
+Deserializer& Deserializer::ensure_eof()
 {
     if (!this->stream.eof()) {
         throw DeserializationExpectedEof();
     }
+    return *this;
+}
+
+Deserializer& Deserializer::operator>>(Deserializable& data)
+{
+    data.deserialize(*this);
+    return *this;
 }
 
 Deserializer::~Deserializer()
@@ -191,6 +192,18 @@ char const *PlaintextInvalidInt::content() const
 PlaintextDeserializer::PlaintextDeserializer(std::istream& stream) :
     Deserializer(stream)
 {
+}
+
+Deserializer& PlaintextDeserializer::ensure_eof()
+{
+    while (!this->stream.eof()) {
+        uint8_t ch = 0;
+        this->stream >> ch;
+        if (!this->stream.eof() && !std::isspace(ch)) {
+            throw DeserializationExpectedEof();
+        }
+    }
+    return *this;
 }
 
 Deserializer& PlaintextDeserializer::operator>>(bool& data)

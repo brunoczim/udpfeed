@@ -91,7 +91,9 @@ void start_client_interface(
                             dynamic_cast<ClientNotifNotice const&>(*notice);
                         std::cout
                             << notif_notice.sender.content()
-                            << " sent: "
+                            << " sent at "
+                            << notif_notice.sent_at
+                            << ": "
                             << notif_notice.message.content()
                             << std::endl;
                         break;

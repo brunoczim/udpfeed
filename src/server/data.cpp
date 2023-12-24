@@ -2,8 +2,20 @@
 #include "data.h"
 
 ServerProfileTable::Notification::Notification() :
-    id(0),
-    pending_count(0)
+    Notification(0, NotifMessage(), 0, 0)
+{
+}
+
+ServerProfileTable::Notification::Notification(
+    uint64_t id,
+    NotifMessage message,
+    int64_t timestamp,
+    uint64_t pending_count
+) :
+    id(id),
+    message(message),
+    sent_at(timestamp),
+    pending_count(pending_count)
 {
 }
 
@@ -12,6 +24,7 @@ void ServerProfileTable::Notification::serialize(Serializer& stream) const
     stream
         << this->id
         << this->message
+        << this->sent_at
         << this->pending_count;
 }
 
@@ -20,16 +33,19 @@ void ServerProfileTable::Notification::deserialize(Deserializer& stream)
     stream
         >> this->id
         >> this->message
+        >> this->sent_at
         >> this->pending_count;
 }
 
 ServerProfileTable::Profile::Profile(Username username, int64_t timestamp) :
-    Profile()
+    username(username),
+    created_at(timestamp),
+    notif_counter(0)
 {
     this->username = username;
 }
 
-ServerProfileTable::Profile::Profile() : notif_counter(0)
+ServerProfileTable::Profile::Profile() : Profile(Username(), 0)
 {
 }
 
@@ -38,6 +54,7 @@ void ServerProfileTable::Profile::serialize(Serializer& stream) const
     stream
         << this->notif_counter
         << this->username
+        << this->created_at
         << this->followers
         << this->received_notifs
         << this->pending_notifs;
@@ -48,6 +65,7 @@ void ServerProfileTable::Profile::deserialize(Deserializer& stream)
     stream
         >> this->notif_counter
         >> this->username
+        >> this->created_at
         >> this->followers
         >> this->received_notifs
         >> this->pending_notifs;
@@ -60,6 +78,7 @@ ServerProfileTable::ServerProfileTable()
 void ServerProfileTable::connect(
     Address client,
     Username const& profile_username,
+    Channel<Username>::Sender& followers_sender,
     int64_t timestamp
 )
 {
@@ -74,6 +93,10 @@ void ServerProfileTable::connect(
     Profile& profile = this->profiles[profile_username];
     if (profile.sessions.size() >= ServerProfileTable::MAX_SESSIONS_PER_PROF) {
         throw ThrowableMessageError(MSG_TOO_MANY_SESSIONS);
+    }
+
+    if (!profile.pending_notifs.empty()) {
+        followers_sender.send(profile.username);
     }
 
     profile.sessions.insert(client);
@@ -133,12 +156,13 @@ void ServerProfileTable::notify(
 
     Profile& sender = std::get<1>(*sender_node);
     sender.notif_counter++;
-    Notification notif;
-    notif.id = sender.notif_counter;
-    notif.message = message;
-    notif.pending_count = sender.followers.size();
+    uint64_t notif_id = sender.notif_counter;
+    uint64_t pending_count = sender.followers.size();
 
-    sender.received_notifs.insert(std::make_pair(notif.id, notif));
+    sender.received_notifs.insert(std::make_pair(
+        notif_id,
+        Notification(notif_id, message, timestamp, pending_count)
+    ));
 
     for (auto const& follower_username : sender.followers) {
         auto followed_node = this->profiles.find(follower_username);
@@ -149,7 +173,7 @@ void ServerProfileTable::notify(
         Profile& follower = std::get<1>(*followed_node);
         follower.pending_notifs.push_back(std::make_pair(
             sender_username,
-            notif.id
+            notif_id
         ));
     }
 
@@ -181,6 +205,7 @@ std::optional<PendingNotif> ServerProfileTable::consume_one_notif(
         ServerProfileTable::Notification& notif =
             followed.received_notifs[notif_id];
         pending_notif.message = notif.message;
+        pending_notif.sent_at = notif.sent_at;
         notif.pending_count--;
         delivered_to_all = notif.pending_count == 0;
     }
@@ -202,7 +227,7 @@ void ServerProfileTable::persist(std::string const& path) const
 
     serializer << *this;
 
-    file.flush();
+    file << std::endl << std::flush;
     file.close();
 }
 
@@ -228,9 +253,12 @@ bool ServerProfileTable::load(std::string const& path)
         PlaintextDeserializer deserializer_impl(file);
         Deserializer& deserializer = deserializer_impl;
 
-        deserializer >> *this;
-
-        success = !file.fail();
+        try {
+            deserializer >> *this;
+            deserializer.ensure_eof();
+            success = !file.fail();
+        } catch (DeserializationError const& exc) {
+        }
 
         file.close();
     }

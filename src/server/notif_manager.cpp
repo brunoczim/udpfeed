@@ -24,7 +24,8 @@ void start_server_notification_manager(
                     enveloped.message.body = std::shared_ptr<MessageBody>(
                         new MessageDeliverReq(
                             Username(pending_notif->sender),
-                            NotifMessage(pending_notif->message)
+                            NotifMessage(pending_notif->message),
+                            pending_notif->sent_at
                         )
                     );
 

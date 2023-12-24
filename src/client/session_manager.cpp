@@ -195,7 +195,8 @@ void start_client_session_manager(
                                 std::shared_ptr<ClientNotifNotice>(
                                     new ClientNotifNotice(
                                         msg_deliver.sender,
-                                        msg_deliver.notif_message
+                                        msg_deliver.notif_message,
+                                        msg_deliver.sent_at
                                     )
                                 );
                             to_interface.send(notice);

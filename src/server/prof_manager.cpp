@@ -35,6 +35,7 @@ void start_server_profile_manager(
                             profile_table->connect(
                                 req_enveloped.remote,
                                 message.username,
+                                to_notif_man,
                                 req_enveloped.message.header.timestamp
                             );
                             std::move(req).send_resp(
@@ -50,6 +51,8 @@ void start_server_profile_manager(
                                     << req_enveloped.remote.to_string()
                                     << " connected with username "
                                     << message.username.content()
+                                    << " at "
+                                    << req_enveloped.message.header.timestamp
                                     << std::endl;
                             });
                             break;
@@ -70,7 +73,8 @@ void start_server_profile_manager(
                             ] (auto& output) {
                                 output << "Client "
                                     << req_enveloped.remote.to_string()
-                                    << " disconnected"
+                                    << " disconnected at "
+                                    << req_enveloped.message.header.timestamp
                                     << std::endl;
                             });
                             break;
@@ -98,6 +102,8 @@ void start_server_profile_manager(
                                     << req_enveloped.remote.to_string()
                                     << " profile started following "
                                     << message.username.content()
+                                    << " at "
+                                    << req_enveloped.message.header.timestamp
                                     << std::endl;
                             });
                             break;
@@ -125,7 +131,9 @@ void start_server_profile_manager(
                             ] (auto& output) {
                                 output << "Client "
                                     << req_enveloped.remote.to_string()
-                                    << " sent notification with: "
+                                    << " sent notification at "
+                                    << req_enveloped.message.header.timestamp
+                                    << " with: "
                                     << message.notif_message.content()
                                     << std::endl;
                             });

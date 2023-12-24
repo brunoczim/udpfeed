@@ -93,6 +93,8 @@ class Deserializer {
     public:
         Deserializer(std::istream& stream);
 
+        virtual Deserializer& ensure_eof();
+
         virtual Deserializer& operator>>(bool& data) = 0;
         virtual Deserializer& operator>>(uint8_t& data) = 0;
         virtual Deserializer& operator>>(uint16_t& data) = 0;
@@ -122,8 +124,6 @@ class Deserializer {
         Deserializer& operator>>(std::pair<A, B>& data);
 
         virtual Deserializer& operator>>(Deserializable& data);
-
-        virtual void ensure_eof();
 
         virtual ~Deserializer();
 };
@@ -286,6 +286,8 @@ class PlaintextInvalidInt : public DeserializationError {
 class PlaintextDeserializer : public Deserializer {
     public:
         PlaintextDeserializer(std::istream& stream);
+
+        virtual Deserializer& ensure_eof();
 
         virtual Deserializer& operator>>(bool& data);
         virtual Deserializer& operator>>(uint8_t& data);

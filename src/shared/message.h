@@ -258,11 +258,13 @@ class MessageDeliverReq : public MessageBody {
     public:
         Username sender;
         NotifMessage notif_message;
+        int64_t sent_at;
 
         MessageDeliverReq();
         MessageDeliverReq(
             Username const& sender,
-            NotifMessage const& notif_msg
+            NotifMessage const& notif_msg,
+            int64_t sent_at
         );
 
         virtual MessageTag tag() const;
