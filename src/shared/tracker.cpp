@@ -87,12 +87,19 @@ ThreadTracker::ThreadTracker() : ThreadTracker(Channel<std::thread>())
 {
 }
 
-ThreadTracker::~ThreadTracker()
+void ThreadTracker::join_all()
 {
     {
         std::unique_lock lock(std::move(this->inner->lock()));
         this->inner->unsafe_finish_all();
         this->inner->close();
     }
-    this->joiner_thread.join();
+    if (this->joiner_thread.joinable()) {
+        this->joiner_thread.join();
+    }
+}
+
+ThreadTracker::~ThreadTracker()
+{
+    this->join_all();
 }

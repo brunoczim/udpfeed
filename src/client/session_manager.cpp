@@ -214,6 +214,9 @@ void start_client_session_manager(
                                 );
                             std::move(received).send_resp(response);
                             connected = false;
+                            Logger::with([] (auto& output) {
+                                output << "Server disconnected" << std::endl;
+                            });
                             break;
                         }
                     }
