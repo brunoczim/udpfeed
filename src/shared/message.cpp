@@ -69,6 +69,7 @@ MessageType msg_type_from_code(uint16_t code)
         case MSG_DISCONNECT: return MSG_DISCONNECT;
         case MSG_FOLLOW: return MSG_FOLLOW;
         case MSG_NOTIFY: return MSG_NOTIFY;
+        case MSG_DELIVER: return MSG_DELIVER;
         default: throw InvalidMessageType(code);
     }
 }
@@ -359,7 +360,7 @@ void MessageDisconnectResp::deserialize(Deserializer& deserializer)
 {
 }
 
-MessageFollowReq::MessageFollowReq() : MessageFollowReq(std::string())
+MessageFollowReq::MessageFollowReq()
 {
 }
 
@@ -508,21 +509,45 @@ void Message::deserialize(Deserializer& deserializer)
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageDisconnectReq);
                     break;
+                case MSG_FOLLOW:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageFollowReq);
+                    break;
+                case MSG_NOTIFY:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageNotifyReq);
+                    break;
+                case MSG_DELIVER:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageDeliverReq);
+                    break;
             }
             break;
         case MSG_RESP:
             switch (tag.type) {
-                case MSG_CONNECT:
-                    this->body =
-                        std::shared_ptr<MessageBody>(new MessageConnectResp);
-                    break;
                 case MSG_ERROR:
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageErrorResp);
                     break;
+                case MSG_CONNECT:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageConnectResp);
+                    break;
                 case MSG_DISCONNECT:
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageDisconnectResp);
+                    break;
+                case MSG_FOLLOW:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageFollowResp);
+                    break;
+                case MSG_NOTIFY:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageNotifyResp);
+                    break;
+                case MSG_DELIVER:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessageDeliverResp);
                     break;
             }
             break;

@@ -1,4 +1,5 @@
 #include "notif_manager.h"
+#include "../shared/shutdown.h"
 
 void start_server_notification_manager(
     ThreadTracker& thread_tracker,
@@ -35,5 +36,6 @@ void start_server_notification_manager(
             }
         } catch (ChannelDisconnected const& exc) {
         }
+        signal_graceful_shutdown();
     });
 }

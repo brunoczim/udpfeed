@@ -13,6 +13,8 @@ enum ShutdownEof {
     SHUTDOWN_PASSIVE_EOF
 };
 
+void signal_graceful_shutdown();
+
 void wait_for_graceful_shutdown(ShutdownEof shutdown_eof);
 
 class GracefulShutdown {

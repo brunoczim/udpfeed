@@ -16,6 +16,11 @@ static std::atomic<State> state;
 
 static void signal_handler(int signal_code);
 
+void signal_graceful_shutdown()
+{
+    state.store(STATE_EXITING);
+}
+
 void wait_for_graceful_shutdown(ShutdownEof shutdown_eof)
 {
     using namespace std::chrono_literals;
