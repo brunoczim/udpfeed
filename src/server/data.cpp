@@ -1,5 +1,6 @@
 #include <fstream>
 #include "data.h"
+#include "../shared/log.h"
 
 ServerProfileTable::Notification::Notification() :
     Notification(0, NotifMessage(), 0, 0)
@@ -228,6 +229,23 @@ void ServerProfileTable::persist(std::string const& path) const
     serializer << *this;
 
     file << std::endl << std::flush;
+
+    if (file.good() || file.eof()) {
+        Logger::with([&path] (auto& output) {
+            output
+                << "Successfully persisted server data to "
+                << path
+                << std::endl;
+        });
+    } else {
+        Logger::with([&path] (auto& output) {
+            output
+                << "Failed to persist server data to "
+                << path
+                << std::endl;
+        });
+    }
+
     file.close();
 }
 
@@ -245,25 +263,45 @@ bool ServerProfileTable::load(std::string const& path)
 {
     bool success = false;
 
+    Logger::with([&path] (auto& output) {
+        output
+            << "Will attempt to load server data from "
+            << path
+            << std::endl;
+    });
+
     std::ifstream file;
 
     file.open(path, std::ios::in | std::ios::binary);
 
-    if (!file.fail()) {
+    if (file.is_open()) {
         PlaintextDeserializer deserializer_impl(file);
         Deserializer& deserializer = deserializer_impl;
 
         try {
             deserializer >> *this;
             deserializer.ensure_eof();
-            success = !file.fail();
+            success = file.good() || file.eof();
         } catch (DeserializationError const& exc) {
+            Logger::with([&exc] (auto& output) {
+                output
+                    << "Failed to deserialize server data: "
+                    << exc.what()
+                    << std::endl;
+            });
         }
 
         file.close();
     }
 
-    if (!success) {
+    if (success) {
+        Logger::with([] (auto& output) {
+            output << "Loaded server data from file" << std::endl;
+        });
+    } else {
+        Logger::with([] (auto& output) {
+            output << "Did not load server data file" << std::endl;
+        });
         this->profiles.clear();
     }
 
