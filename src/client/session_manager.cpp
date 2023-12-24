@@ -130,14 +130,20 @@ void start_client_session_manager(
                 }
             }
         } catch (MissedResponse const& exc) {
-            to_interface.send(std::shared_ptr<ClientOutputNotice>(
-                new ClientErrorNotice(MSG_MISSED_RESP)
-            ));
+            try {
+                to_interface.send(std::shared_ptr<ClientOutputNotice>(
+                    new ClientErrorNotice(MSG_MISSED_RESP)
+                ));
+            } catch (ChannelDisconnected const& exc) {
+            }
         } catch (ChannelDisconnected const& exc) {
         } catch (CastOnMessageError const& exc) {
-            to_interface.send(std::shared_ptr<ClientOutputNotice>(
-                new ClientErrorNotice(exc.error())
-            ));
+            try {
+                to_interface.send(std::shared_ptr<ClientOutputNotice>(
+                    new ClientErrorNotice(exc.error())
+                ));
+            } catch (ChannelDisconnected const& exc) {
+            }
         }
     });
 

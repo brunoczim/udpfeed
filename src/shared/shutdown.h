@@ -8,7 +8,12 @@
 #include <memory>
 #include <condition_variable>
 
-void wait_for_graceful_shutdown();
+enum ShutdownEof {
+    SHUTDOWN_ACTIVE_EOF,
+    SHUTDOWN_PASSIVE_EOF
+};
+
+void wait_for_graceful_shutdown(ShutdownEof shutdown_eof);
 
 class GracefulShutdown {
     private:
@@ -28,6 +33,7 @@ class GracefulShutdown {
         static void shutdown();
 
     public:
+
         template <typename F>
         static void set_action(F&& action);
 
