@@ -20,24 +20,6 @@ ServerProfileTable::Notification::Notification(
 {
 }
 
-void ServerProfileTable::Notification::serialize(Serializer& stream) const
-{
-    stream
-        << this->id
-        << this->message
-        << this->sent_at
-        << this->pending_count;
-}
-
-void ServerProfileTable::Notification::deserialize(Deserializer& stream)
-{
-    stream
-        >> this->id
-        >> this->message
-        >> this->sent_at
-        >> this->pending_count;
-}
-
 ServerProfileTable::Profile::Profile(Username username, int64_t timestamp) :
     username(username),
     created_at(timestamp),
@@ -53,23 +35,19 @@ ServerProfileTable::Profile::Profile() : Profile(Username(), 0)
 void ServerProfileTable::Profile::serialize(Serializer& stream) const
 {
     stream
-        << this->notif_counter
         << this->username
         << this->created_at
         << this->followers
-        << this->received_notifs
-        << this->pending_notifs;
+    ;
 }
 
 void ServerProfileTable::Profile::deserialize(Deserializer& stream)
 {
     stream
-        >> this->notif_counter
         >> this->username
         >> this->created_at
         >> this->followers
-        >> this->received_notifs
-        >> this->pending_notifs;
+    ;
 }
 
 ServerProfileTable::ServerProfileTable()
@@ -79,7 +57,6 @@ ServerProfileTable::ServerProfileTable()
 void ServerProfileTable::connect(
     Address client,
     Username const& profile_username,
-    Channel<Username>::Sender& followers_sender,
     int64_t timestamp
 )
 {
@@ -94,10 +71,6 @@ void ServerProfileTable::connect(
     Profile& profile = this->profiles[profile_username];
     if (profile.sessions.size() >= ServerProfileTable::MAX_SESSIONS_PER_PROF) {
         throw ThrowableMessageError(MSG_TOO_MANY_SESSIONS);
-    }
-
-    if (!profile.pending_notifs.empty()) {
-        followers_sender.send(profile.username);
     }
 
     profile.sessions.insert(client);

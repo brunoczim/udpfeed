@@ -35,7 +35,6 @@ void start_server_profile_manager(
                             profile_table->connect(
                                 req_enveloped.remote,
                                 message.username,
-                                to_notif_man,
                                 req_enveloped.message.header.timestamp
                             );
                             std::move(req).send_resp(

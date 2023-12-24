@@ -23,7 +23,7 @@ class PendingNotif {
 
 class ServerProfileTable : public Serializable, public Deserializable {
     private:
-        class Notification : public Serializable, public Deserializable {
+        class Notification {
             public:
                 uint64_t id;
                 NotifMessage message;
@@ -37,9 +37,6 @@ class ServerProfileTable : public Serializable, public Deserializable {
                     int64_t timestamp,
                     uint64_t pending_count
                 );
-
-                virtual void serialize(Serializer& stream) const;
-                virtual void deserialize(Deserializer& stream);
         };
 
         class Profile : public Serializable, public Deserializable {
@@ -74,7 +71,6 @@ class ServerProfileTable : public Serializable, public Deserializable {
         void connect(
             Address client,
             Username const& profile,
-            Channel<Username>::Sender& followers_sender,
             int64_t timestamp
         );
 
