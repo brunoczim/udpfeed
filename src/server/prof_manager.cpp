@@ -7,6 +7,18 @@ char const *InvalidServerProfManMsg::what() const noexcept
     return "invalid server profile manager message";
 }
 
+ServerProfManDataGuard::ServerProfManDataGuard(
+    std::shared_ptr<ServerProfileTable> const& profile_table
+) :
+    profile_table(profile_table)
+{
+}
+
+ServerProfManDataGuard::~ServerProfManDataGuard()
+{
+    this->profile_table->shutdown();
+}
+
 void start_server_profile_manager(
     ThreadTracker& thread_tracker,
     std::shared_ptr<ServerProfileTable> const& profile_table,
@@ -19,6 +31,7 @@ void start_server_profile_manager(
         from_comm_man = std::move(from_comm_man),
         to_notif_man = std::move(to_notif_man)
     ] () mutable {
+        ServerProfManDataGuard shutdown_guard_(profile_table);
         try {
             for (;;) {
                 ReliableSocket::ReceivedReq req = from_comm_man.receive();
@@ -35,7 +48,6 @@ void start_server_profile_manager(
                             profile_table->connect(
                                 req_enveloped.remote,
                                 message.username,
-                                to_notif_man,
                                 req_enveloped.message.header.timestamp
                             );
                             std::move(req).send_resp(
@@ -58,8 +70,8 @@ void start_server_profile_manager(
                             break;
                         }
 
-                        case MSG_DISCONNECT:
-                            profile_table->disconnect(
+                        case MSG_DISCONNECT: {
+                            bool disconnected = profile_table->disconnect(
                                 req_enveloped.remote,
                                 req_enveloped.message.header.timestamp
                             );
@@ -68,16 +80,21 @@ void start_server_profile_manager(
                                     new MessageDisconnectResp
                                 )
                             );
-                            Logger::with([
-                                &req_enveloped
-                            ] (auto& output) {
-                                output << "Client "
-                                    << req_enveloped.remote.to_string()
-                                    << " disconnected at "
-                                    << req_enveloped.message.header.timestamp
-                                    << std::endl;
-                            });
+                            if (disconnected) {
+                                Logger::with([
+                                    &req_enveloped
+                                ] (auto& output) {
+                                    int64_t timestamp =
+                                        req_enveloped.message.header.timestamp;
+                                    output << "Client "
+                                        << req_enveloped.remote.to_string()
+                                        << " disconnected at "
+                                        << timestamp
+                                        << std::endl;
+                                });
+                            }
                             break;
+                        }
 
                         case MSG_FOLLOW: {
                             MessageFollowReq const& message = req_enveloped
@@ -152,5 +169,9 @@ void start_server_profile_manager(
         } catch (ChannelDisconnected const& exc) {
         }
         signal_graceful_shutdown();
+    });
+
+    thread_tracker.spawn([profile_table] () mutable {
+        while (profile_table->persist_on_dirty()) {}
     });
 }

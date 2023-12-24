@@ -15,38 +15,31 @@ static TestSuite server_data_test_suite()
     return TestSuite()
         .test("just connect", [] {
             ServerProfileTable table;
-            Channel<Username> channel;
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 Username("@helloworld"),
-                channel.sender,
                 0
             );
         })
         .test("just disconnect", [] {
             ServerProfileTable table;
-            Channel<Username> channel;
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 Username("@helloworld"),
-                channel.sender,
                 0
             );
             table.disconnect(Address(make_ipv4({ 127, 0, 0, 1 }), 3232), 1);
         })
         .test("just follow", [] {
             ServerProfileTable table;
-            Channel<Username> channel;
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 Username("@helloworld"),
-                channel.sender,
                 0
             );
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 4545),
                 Username("@goodbye"),
-                channel.sender,
                 1
             );
             table.follow(
@@ -57,17 +50,14 @@ static TestSuite server_data_test_suite()
         })
         .test("just notify", [] {
             ServerProfileTable table;
-            Channel<Username> channel;
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 Username("@helloworld"),
-                channel.sender,
                 0
             );
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 4545),
                 Username("@goodbye"),
-                channel.sender,
                 1
             );
             table.follow(
@@ -76,15 +66,15 @@ static TestSuite server_data_test_suite()
                 2
             );
 
-            Channel<Username> actual_channel;
+            Channel<Username> channel;
             table.notify(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 NotifMessage("Hello, World!"),
-                actual_channel.sender,
+                channel.sender,
                 3
             );
 
-            Username follower_username = actual_channel.receiver.receive();
+            Username follower_username = channel.receiver.receive();
             TEST_ASSERT(
                 "follower user name should be @goodbye, found"
                     + follower_username.content(),
@@ -125,36 +115,30 @@ static TestSuite server_data_test_suite()
 
         .test("full database workflow", [] {
             ServerProfileTable table;
-            Channel<Username> channel;
 
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 Username("@helloworld"),
-                channel.sender,
                 0
             );
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 4545),
                 Username("@goodbye"),
-                channel.sender,
                 1
             );
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 6665),
                 Username("@bruno"),
-                channel.sender,
                 2
             );
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 6667),
                 Username("@cavejohnson"),
-                channel.sender,
                 3
             );
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 7878),
                 Username("@whoo"),
-                channel.sender,
                 4
             );
 
@@ -179,6 +163,7 @@ static TestSuite server_data_test_suite()
                 8
             );
 
+            Channel<Username> channel;
             table.notify(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 NotifMessage("Hello"),
@@ -417,24 +402,19 @@ static TestSuite server_data_test_suite()
 
         .test("do not allow three sessions", [] {
             ServerProfileTable table;
-            Channel<Username> channel;
-
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 Username("@helloworld"),
-                channel.sender,
                 0
             );
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 4545),
                 Username("@goodbye"),
-                channel.sender,
                 1
             );
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 7878),
                 Username("@helloworld"),
-                channel.sender,
                 0
             );
 
@@ -443,7 +423,6 @@ static TestSuite server_data_test_suite()
                 table.connect(
                     Address(make_ipv4({ 127, 0, 0, 1 }), 7878),
                     Username("@helloworld"),
-                    channel.sender,
                     0
                 );
             } catch (ThrowableMessageError const& exc) {
@@ -464,12 +443,9 @@ static TestSuite server_data_test_suite()
 
         .test("do not follow without connect", [] {
             ServerProfileTable table;
-            Channel<Username> channel;
-
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 Username("@helloworld"),
-                channel.sender,
                 0
             );
 
@@ -525,18 +501,14 @@ static TestSuite server_data_test_suite()
 
         .test("do not follow unknown profile", [] {
             ServerProfileTable table;
-            Channel<Username> channel;
-
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 3232),
                 Username("@helloworld"),
-                channel.sender,
                 0
             );
             table.connect(
                 Address(make_ipv4({ 127, 0, 0, 1 }), 4545),
                 Username("@goodbye"),
-                channel.sender,
                 1
             );
 

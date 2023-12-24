@@ -12,6 +12,17 @@ class InvalidServerProfManMsg {
         virtual char const *what() const noexcept;
 };
 
+class ServerProfManDataGuard {
+    private:
+        std::shared_ptr<ServerProfileTable> profile_table;
+ 
+    public:
+        ServerProfManDataGuard(
+            std::shared_ptr<ServerProfileTable> const& table
+        );
+        ~ServerProfManDataGuard();
+};
+
 void start_server_profile_manager(
     ThreadTracker& thread_tracker,
     std::shared_ptr<ServerProfileTable> const& profile_table,
