@@ -1,4 +1,5 @@
 #include <fstream>
+#include <sstream>
 #include "data.h"
 #include "../shared/log.h"
 
@@ -50,8 +51,39 @@ void ServerProfileTable::Profile::deserialize(Deserializer& stream)
     ;
 }
 
-ServerProfileTable::ServerProfileTable()
+ServerProfileTable::ServerProfileTable() : active(true), dirty(false)
 {
+    char const *var = getenv(ServerProfileTable::path_env_var);
+    if (var == NULL) {
+        this->unsafe_set_path(ServerProfileTable::default_path);
+    } else {
+        this->unsafe_set_path(var);
+    }
+}
+
+ServerProfileTable::ServerProfileTable(std::string const& path) :
+    active(true),
+    dirty(false)
+{
+    this->unsafe_set_path(path);
+}
+
+void ServerProfileTable::unsafe_set_path(std::string const& path)
+{
+    this->path = path;
+    Logger::with([&path] (auto& output) {
+        output
+            << "Using file with path "
+            << path
+            << " to persist server data"
+            << std::endl;
+    });
+}
+
+void ServerProfileTable::unsafe_set_dirty()
+{
+    this->dirty = true;
+    this->persistence_cond_var.notify_one();
 }
 
 void ServerProfileTable::connect(
@@ -60,7 +92,7 @@ void ServerProfileTable::connect(
     int64_t timestamp
 )
 {
-    std::unique_lock lock(this->control_mutex);
+    std::unique_lock lock(this->data_control_mutex);
     if (this->profiles.find(profile_username) == this->profiles.end()) {
         this->profiles.insert(std::make_pair(
             profile_username,
@@ -75,15 +107,19 @@ void ServerProfileTable::connect(
 
     profile.sessions.insert(client);
     this->sessions.insert(std::make_pair(client, profile_username));
+
+    this->unsafe_set_dirty();
 }
 
 void ServerProfileTable::disconnect(Address client, int64_t timestamp)
 {
-    std::unique_lock lock(this->control_mutex);
+    std::unique_lock lock(this->data_control_mutex);
 
     if (auto node = this->sessions.extract(client)) {
         this->profiles[node.mapped()].sessions.erase(client);
     }
+
+    this->unsafe_set_dirty();
 }
 
 void ServerProfileTable::follow(
@@ -92,7 +128,7 @@ void ServerProfileTable::follow(
     int64_t timestamp
 )
 {
-    std::unique_lock lock(this->control_mutex);
+    std::unique_lock lock(this->data_control_mutex);
 
     auto follower_node = this->sessions.find(client);
     if (follower_node == this->sessions.end()) {
@@ -105,6 +141,8 @@ void ServerProfileTable::follow(
     Username follower_username = std::get<1>(*follower_node);
     Profile& followed = std::get<1>(*followed_node);
     followed.followers.insert(follower_username);
+
+    this->unsafe_set_dirty();
 }
 
 void ServerProfileTable::notify(
@@ -114,7 +152,7 @@ void ServerProfileTable::notify(
     int64_t timestamp
 )
 {
-    std::unique_lock lock(this->control_mutex);
+    std::unique_lock lock(this->data_control_mutex);
 
     auto sender_sesssion_node = this->sessions.find(client);
     if (sender_sesssion_node == this->sessions.end()) {
@@ -150,14 +188,13 @@ void ServerProfileTable::notify(
             notif_id
         ));
     }
-
 }
 
 std::optional<PendingNotif> ServerProfileTable::consume_one_notif(
     Username username
 )
 {
-    std::unique_lock lock(this->control_mutex);
+    std::unique_lock lock(this->data_control_mutex);
     Profile& follower = this->profiles[username];
     if (follower.pending_notifs.empty()) {
         return std::optional<PendingNotif>();
@@ -190,59 +227,62 @@ std::optional<PendingNotif> ServerProfileTable::consume_one_notif(
     return std::make_optional(pending_notif);
 }
 
-void ServerProfileTable::persist(std::string const& path) const
+bool ServerProfileTable::persist_on_dirty()
 {
-    std::ofstream file;
+    bool dirty = false;
+    bool active = true;
+    std::ostringstream sstream;
+    {
+        PlaintextSerializer serializer_impl(sstream);
+        Serializer& serializer = serializer_impl;
 
-    file.open(path, std::ios::out | std::ios::trunc | std::ios::binary);
+        std::unique_lock lock(this->data_control_mutex);
 
-    PlaintextSerializer serializer_impl(file);
-    Serializer& serializer = serializer_impl;
+        while (this->active && !this->dirty) {
+            this->persistence_cond_var.wait(lock);
+        }
 
-    serializer << *this;
+        dirty = this->dirty;
+        this->dirty = false;
+        active = this->active;
 
-    file << std::endl << std::flush;
-
-    if (file.good() || file.eof()) {
-        Logger::with([&path] (auto& output) {
-            output
-                << "Successfully persisted server data to "
-                << path
-                << std::endl;
-        });
-    } else {
-        Logger::with([&path] (auto& output) {
-            output
-                << "Failed to persist server data to "
-                << path
-                << std::endl;
-        });
+        serializer << *this;
     }
 
-    file.close();
-}
+    if (dirty) {
+        std::unique_lock lock(this->file_control_mutex);
+        std::ofstream file;
 
-void ServerProfileTable::persist() const
-{
-    char const *var = getenv(ServerProfileTable::file_env_var);
-    if (var == NULL) {
-        this->persist(ServerProfileTable::default_file);
-    } else {
-        this->persist(var);
+        file.open(path, std::ios::out | std::ios::trunc | std::ios::binary);
+
+        file << sstream.str() << std::endl << std::flush;
+
+        if (!file.good() && !file.eof()) {
+            Logger::with([] (auto& output) {
+                output
+                    << "Failed to persist server data"
+                    << std::endl;
+            });
+        }
+
+        file.close();
     }
+
+    return active;
 }
 
-bool ServerProfileTable::load(std::string const& path)
+bool ServerProfileTable::load()
 {
     bool success = false;
 
-    Logger::with([&path] (auto& output) {
+    Logger::with([&path = this->path] (auto& output) {
         output
             << "Will attempt to load server data from "
             << path
             << std::endl;
     });
 
+    std::unique_lock lock(this->file_control_mutex);
     std::ifstream file;
 
     file.open(path, std::ios::in | std::ios::binary);
@@ -281,13 +321,11 @@ bool ServerProfileTable::load(std::string const& path)
     return success;
 }
 
-bool ServerProfileTable::load()
+void ServerProfileTable::shutdown()
 {
-    char const *var = getenv(ServerProfileTable::file_env_var);
-    if (var == NULL) {
-        return this->load(ServerProfileTable::default_file);
-    } 
-    return this->load(var);
+    std::unique_lock lock(this->data_control_mutex);
+    this->active = false;
+    this->persistence_cond_var.notify_all();
 }
 
 void ServerProfileTable::serialize(Serializer& stream) const
@@ -297,6 +335,6 @@ void ServerProfileTable::serialize(Serializer& stream) const
 
 void ServerProfileTable::deserialize(Deserializer& stream)
 {
-    std::unique_lock lock(this->control_mutex);
+    std::unique_lock lock(this->data_control_mutex);
     stream >> this->profiles;
 }

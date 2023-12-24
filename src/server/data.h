@@ -56,17 +56,28 @@ class ServerProfileTable : public Serializable, public Deserializable {
                 virtual void deserialize(Deserializer& stream);
         };
 
-        std::mutex control_mutex;
+        std::mutex data_control_mutex;
+        std::condition_variable persistence_cond_var;
+        std::mutex file_control_mutex;
+        bool active;
+        bool dirty;
         std::map<Username, Profile> profiles;
         std::map<Address, Username> sessions;
+        std::string path;
+
+        void unsafe_set_path(std::string const& path);
+
+        void unsafe_set_dirty();
+
     public:
         static constexpr size_t MAX_SESSIONS_PER_PROF = 2;
 
-        static constexpr char const *file_env_var = "SISOP2_PERSIST_FILE";
+        static constexpr char const *path_env_var = "SISOP2_PERSIST_FILE";
 
-        static constexpr char const *default_file = ".sisop2_udpfeed_data";
+        static constexpr char const *default_path = ".sisop2_udpfeed_data";
 
         ServerProfileTable();
+        ServerProfileTable(std::string const& path);
 
         void connect(
             Address client,
@@ -91,11 +102,11 @@ class ServerProfileTable : public Serializable, public Deserializable {
 
         std::optional<PendingNotif> consume_one_notif(Username username);
 
-        void persist(std::string const& path) const;
-        void persist() const;
+        bool persist_on_dirty();
 
-        bool load(std::string const& path);
         bool load();
+
+        void shutdown();
 
         virtual void serialize(Serializer& stream) const;
         virtual void deserialize(Deserializer& stream);

@@ -98,8 +98,6 @@ int main(int argc, char const *argv[])
 
     thread_tracker.join_all();
 
-    profile_table->persist();
-
     return 0;
 }
 

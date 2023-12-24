@@ -7,6 +7,18 @@ char const *InvalidServerProfManMsg::what() const noexcept
     return "invalid server profile manager message";
 }
 
+ServerProfManDataGuard::ServerProfManDataGuard(
+    std::shared_ptr<ServerProfileTable> const& profile_table
+) :
+    profile_table(profile_table)
+{
+}
+
+ServerProfManDataGuard::~ServerProfManDataGuard()
+{
+    this->profile_table->shutdown();
+}
+
 void start_server_profile_manager(
     ThreadTracker& thread_tracker,
     std::shared_ptr<ServerProfileTable> const& profile_table,
@@ -19,6 +31,7 @@ void start_server_profile_manager(
         from_comm_man = std::move(from_comm_man),
         to_notif_man = std::move(to_notif_man)
     ] () mutable {
+        ServerProfManDataGuard shutdown_guard_(profile_table);
         try {
             for (;;) {
                 ReliableSocket::ReceivedReq req = from_comm_man.receive();
@@ -151,5 +164,9 @@ void start_server_profile_manager(
         } catch (ChannelDisconnected const& exc) {
         }
         signal_graceful_shutdown();
+    });
+
+    thread_tracker.spawn([profile_table] () mutable {
+        while (profile_table->persist_on_dirty()) {}
     });
 }
