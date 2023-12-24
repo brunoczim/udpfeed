@@ -124,6 +124,7 @@ MessageError msg_error_from_code(uint16_t code)
         case MSG_OUTDATED_SEQN: return MSG_OUTDATED_SEQN;
         case MSG_UNKNOWN_USERNAME: return MSG_UNKNOWN_USERNAME;
         case MSG_TOO_MANY_SESSIONS: return MSG_TOO_MANY_SESSIONS;
+        case MSG_CANNOT_FOLLOW_SELF: return MSG_CANNOT_FOLLOW_SELF;
         default: throw InvalidMessageError(code);
     }
 }
@@ -137,6 +138,7 @@ char const *msg_error_render(MessageError error)
         case MSG_OUTDATED_SEQN: return "message sequence number is outdated";
         case MSG_UNKNOWN_USERNAME: return "given username is unknown";
         case MSG_TOO_MANY_SESSIONS: return "profile has too many sessions";
+        case MSG_CANNOT_FOLLOW_SELF: return "profile cannot follow itself";
         default: return "unknown error";
     }
 }

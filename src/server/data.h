@@ -85,7 +85,7 @@ class ServerProfileTable : public Serializable, public Deserializable {
             int64_t timestamp
         );
 
-        void disconnect(Address client, int64_t timestamp);
+        bool disconnect(Address client, int64_t timestamp);
 
         void follow(
             Address client,

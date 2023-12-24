@@ -29,7 +29,8 @@ enum MessageError {
     MSG_NO_CONNECTION,
     MSG_OUTDATED_SEQN,
     MSG_UNKNOWN_USERNAME,
-    MSG_TOO_MANY_SESSIONS
+    MSG_TOO_MANY_SESSIONS,
+    MSG_CANNOT_FOLLOW_SELF
 };
 
 class ThrowableMessageError : public std::exception {

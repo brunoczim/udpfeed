@@ -111,15 +111,18 @@ void ServerProfileTable::connect(
     this->unsafe_set_dirty();
 }
 
-void ServerProfileTable::disconnect(Address client, int64_t timestamp)
+bool ServerProfileTable::disconnect(Address client, int64_t timestamp)
 {
+    bool disconnected = false;
     std::unique_lock lock(this->data_control_mutex);
 
     if (auto node = this->sessions.extract(client)) {
         this->profiles[node.mapped()].sessions.erase(client);
+        disconnected = true;
     }
 
     this->unsafe_set_dirty();
+    return disconnected;
 }
 
 void ServerProfileTable::follow(
@@ -139,6 +142,9 @@ void ServerProfileTable::follow(
         throw ThrowableMessageError(MSG_UNKNOWN_USERNAME);
     }
     Username follower_username = std::get<1>(*follower_node);
+    if (follower_username == followed_username) {
+        throw ThrowableMessageError(MSG_CANNOT_FOLLOW_SELF);
+    }
     Profile& followed = std::get<1>(*followed_node);
     followed.followers.insert(follower_username);
 

@@ -70,8 +70,8 @@ void start_server_profile_manager(
                             break;
                         }
 
-                        case MSG_DISCONNECT:
-                            profile_table->disconnect(
+                        case MSG_DISCONNECT: {
+                            bool disconnected = profile_table->disconnect(
                                 req_enveloped.remote,
                                 req_enveloped.message.header.timestamp
                             );
@@ -80,16 +80,21 @@ void start_server_profile_manager(
                                     new MessageDisconnectResp
                                 )
                             );
-                            Logger::with([
-                                &req_enveloped
-                            ] (auto& output) {
-                                output << "Client "
-                                    << req_enveloped.remote.to_string()
-                                    << " disconnected at "
-                                    << req_enveloped.message.header.timestamp
-                                    << std::endl;
-                            });
+                            if (disconnected) {
+                                Logger::with([
+                                    &req_enveloped
+                                ] (auto& output) {
+                                    int64_t timestamp =
+                                        req_enveloped.message.header.timestamp;
+                                    output << "Client "
+                                        << req_enveloped.remote.to_string()
+                                        << " disconnected at "
+                                        << timestamp
+                                        << std::endl;
+                                });
+                            }
                             break;
+                        }
 
                         case MSG_FOLLOW: {
                             MessageFollowReq const& message = req_enveloped
