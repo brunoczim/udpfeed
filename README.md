@@ -5,7 +5,7 @@ Source code is divided in three modules:
 - `server`
 - `shared` (code shared between client and server)
 
-Besides that, we also have a test suite. Writing tests is optional.
+Besides that, there's also a test suite.
 
 # Building
 
@@ -49,12 +49,9 @@ To run all tests, run this command:
 make test
 ```
 
-Currently, there is no way to run a single test isolated, but we can add this
-feature to the test runner in the future, if necessary.
+Currently, there is no way to run a single test isolated.
 
 ## Writing a Test
-
-Writing tests is optional.
 
 Depending on the module you want to test, you should edit either
 `src/test/shared.cpp`, `src/test/client.cpp` or `src/test/server.cpp`.
