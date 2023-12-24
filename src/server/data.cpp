@@ -1,3 +1,4 @@
+#include <fstream>
 #include "data.h"
 
 ServerProfileTable::Notification::Notification() :
@@ -188,6 +189,66 @@ std::optional<PendingNotif> ServerProfileTable::consume_one_notif(
     }
 
     return std::make_optional(pending_notif);
+}
+
+void ServerProfileTable::persist(std::string const& path) const
+{
+    std::ofstream file;
+
+    file.open(path, std::ios::out | std::ios::trunc | std::ios::binary);
+
+    PlaintextSerializer serializer_impl(file);
+    Serializer& serializer = serializer_impl;
+
+    serializer << *this;
+
+    file.flush();
+    file.close();
+}
+
+void ServerProfileTable::persist() const
+{
+    char const *var = getenv(ServerProfileTable::file_env_var);
+    if (var == NULL) {
+        this->persist(ServerProfileTable::default_file);
+    } else {
+        this->persist(var);
+    }
+}
+
+bool ServerProfileTable::load(std::string const& path)
+{
+    bool success = false;
+
+    std::ifstream file;
+
+    file.open(path, std::ios::in | std::ios::binary);
+
+    if (!file.fail()) {
+        PlaintextDeserializer deserializer_impl(file);
+        Deserializer& deserializer = deserializer_impl;
+
+        deserializer >> *this;
+
+        success = !file.fail();
+
+        file.close();
+    }
+
+    if (!success) {
+        this->profiles.clear();
+    }
+
+    return success;
+}
+
+bool ServerProfileTable::load()
+{
+    char const *var = getenv(ServerProfileTable::file_env_var);
+    if (var == NULL) {
+        return this->load(ServerProfileTable::default_file);
+    } 
+    return this->load(var);
 }
 
 void ServerProfileTable::serialize(Serializer& stream) const

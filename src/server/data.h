@@ -56,6 +56,10 @@ class ServerProfileTable : public Serializable, public Deserializable {
     public:
         static constexpr size_t MAX_SESSIONS_PER_PROF = 2;
 
+        static constexpr char const *file_env_var = "SISOP2_PERSIST_FILE";
+
+        static constexpr char const *default_file = ".sisop2_udpfeed_data";
+
         ServerProfileTable();
 
         void connect(
@@ -80,6 +84,12 @@ class ServerProfileTable : public Serializable, public Deserializable {
         );
 
         std::optional<PendingNotif> consume_one_notif(Username username);
+
+        void persist(std::string const& path) const;
+        void persist() const;
+
+        bool load(std::string const& path);
+        bool load();
 
         virtual void serialize(Serializer& stream) const;
         virtual void deserialize(Deserializer& stream);

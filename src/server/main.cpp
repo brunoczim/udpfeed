@@ -36,6 +36,8 @@ int main(int argc, char const *argv[])
 
     std::shared_ptr<ServerProfileTable> profile_table(new ServerProfileTable);
 
+    profile_table->load();
+
     Channel<ReliableSocket::ReceivedReq> comm_to_prof_man;
     Channel<Enveloped> notif_to_comm_man;
     Channel<Username> prof_to_notif_man;
@@ -93,6 +95,10 @@ int main(int argc, char const *argv[])
     prof_receiver.disconnect();
     comm_receiver.disconnect();
     notif_receiver.disconnect();
+
+    thread_tracker.join_all();
+
+    profile_table->persist();
 
     return 0;
 }

@@ -56,6 +56,8 @@ class ThreadTracker {
 
         template <typename F>
         void spawn(F&& task);
+
+        void join_all();
 };
 
 
