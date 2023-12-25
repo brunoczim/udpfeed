@@ -50,17 +50,13 @@ void start_client_session_manager(
     ThreadTracker& thread_tracker,
     Username const& username,
     Address server_addr,
-    ReliableSocket&& reliable_socket,
+    std::shared_ptr<ReliableSocket> const& socket,
     Channel<std::shared_ptr<ClientOutputNotice>>::Sender&& to_interface,
     Channel<std::shared_ptr<ClientInputCommand>>::Receiver&& from_interface
 )
 {
     Channel<std::shared_ptr<ClientOutputNotice>>::Sender moved_to_interface =
         std::move(to_interface);
-
-    std::shared_ptr<ReliableSocket> socket = std::shared_ptr<ReliableSocket>(
-        new ReliableSocket(std::move(reliable_socket))
-    );
 
     thread_tracker.spawn([
         username,
@@ -80,6 +76,10 @@ void start_client_session_manager(
                 socket->send_req(connect_req);
             Enveloped connect_resp = std::move(sent_connect_req).receive_resp();
             connect_resp.message.body->cast<MessageConnectResp>();
+
+            Logger::with([] (auto& output) {
+                output << "Connected!" << std::endl;
+            });
 
             ClientSessionManDisconnectGuard _guard(server_addr, socket);
 

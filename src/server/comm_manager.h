@@ -6,7 +6,7 @@
 
 void start_server_communication_manager(
     ThreadTracker& thread_tracker,
-    ReliableSocket&& reliable_socket,
+    std::shared_ptr<ReliableSocket> const& socket,
     Channel<ReliableSocket::ReceivedReq>::Sender&& to_profile_man,
     Channel<Enveloped>::Receiver&& from_notif_man
 );

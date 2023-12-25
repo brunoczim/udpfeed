@@ -258,16 +258,16 @@ ReliableSocket::PendingResponse::PendingResponse(
 {
 }
 
-ReliableSocket::Connection::Connection() : Connection(10, 20, Enveloped())
+ReliableSocket::Connection::Connection() : Connection(32, 20, Enveloped())
 {
 }
 
 ReliableSocket::Connection::Connection(
-    uint64_t max_req_attemtps,
+    uint64_t max_req_attempts,
     uint64_t max_cached_sent_resps,
     Enveloped connect_request
 ) :
-    max_req_attemtps(max_req_attemtps),
+    max_req_attempts(max_req_attempts),
     max_cached_sent_resps(max_cached_sent_resps),
     remote_address(connect_request.remote),
     disconnecting(false)
@@ -596,7 +596,7 @@ void ReliableSocket::Inner::disconnect()
 }
 
 ReliableSocket::Config::Config() :
-    max_req_attempts(24),
+    max_req_attempts(32),
     max_cached_sent_resps(100),
     bump_interval_nanos(10 * 1000),
     poll_timeout_ms(10)
@@ -864,5 +864,17 @@ ReliableSocket::ReceivedReq ReliableSocket::receive_req()
 
 void ReliableSocket::disconnect()
 {
+    this->inner->disconnect();
+}
+
+void ReliableSocket::disconnect_timeout(
+    uint64_t interval_nanos,
+    uint64_t intervals
+)
+{
+    while (this->inner->is_connected() && intervals > 0) {
+        std::this_thread::sleep_for(std::chrono::nanoseconds(interval_nanos));
+        intervals--;
+    }
     this->inner->disconnect();
 }

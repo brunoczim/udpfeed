@@ -19,6 +19,8 @@ Arguments parse_arguments(int argc, char const *argv[]);
 
 int main(int argc, char const *argv[])
 {
+    using namespace std::chrono_literals;
+
     Arguments arguments = parse_arguments(argc, argv);
 
     std::ios::sync_with_stdio();
@@ -32,7 +34,7 @@ int main(int argc, char const *argv[])
     });
 
     Socket udp(arguments.bind_address, 1024);
-    ReliableSocket socket(std::move(udp));
+    std::shared_ptr<ReliableSocket> socket(new ReliableSocket(std::move(udp)));
 
     std::shared_ptr<ServerProfileTable> profile_table(new ServerProfileTable);
 
@@ -55,7 +57,7 @@ int main(int argc, char const *argv[])
 
     start_server_communication_manager(
         thread_tracker,
-        std::move(socket),
+        socket,
         std::move(comm_to_prof_man.sender),
         std::move(notif_to_comm_man.receiver)
     );
@@ -95,6 +97,8 @@ int main(int argc, char const *argv[])
     prof_receiver.disconnect();
     comm_receiver.disconnect();
     notif_receiver.disconnect();
+
+    socket->disconnect_timeout(50 * 1000 * 1000, 10);
 
     thread_tracker.join_all();
 

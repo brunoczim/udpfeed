@@ -146,7 +146,7 @@ class ReliableSocket {
             public:
                 Address remote_address;
                 bool disconnecting;
-                uint64_t max_req_attemtps;
+                uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
                 SeqnSet received_seqn_set;
                 std::queue<uint64_t> cached_sent_resp_queue;
@@ -156,7 +156,7 @@ class ReliableSocket {
                 Connection();
 
                 Connection(
-                    uint64_t max_req_attemtps,
+                    uint64_t max_req_attempts,
                     uint64_t max_cached_sent_resps,
                     Enveloped connect_request
                 );
@@ -316,6 +316,8 @@ class ReliableSocket {
         ReceivedReq receive_req();
 
         void disconnect();
+
+        void disconnect_timeout(uint64_t interval_nanos, uint64_t intervals);
 };
 
 #endif

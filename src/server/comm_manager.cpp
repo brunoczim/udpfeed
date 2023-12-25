@@ -5,15 +5,11 @@
 
 void start_server_communication_manager(
     ThreadTracker& thread_tracker,
-    ReliableSocket&& reliable_socket,
+    std::shared_ptr<ReliableSocket> const& socket,
     Channel<ReliableSocket::ReceivedReq>::Sender&& to_profile_man,
     Channel<Enveloped>::Receiver&& from_notif_man
 )
 {
-    std::shared_ptr<ReliableSocket> socket = std::shared_ptr<ReliableSocket>(
-        new ReliableSocket(std::move(reliable_socket))
-    );
-
     thread_tracker.spawn([
         socket,
         from_notif_man = std::move(from_notif_man)
