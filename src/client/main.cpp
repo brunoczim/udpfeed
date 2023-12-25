@@ -38,7 +38,7 @@ int main(int argc, char const *argv[])
 
     ThreadTracker thread_tracker;
     Socket udp(1024);
-    ReliableSocket socket(std::move(udp));
+    std::shared_ptr<ReliableSocket> socket(new ReliableSocket(std::move(udp)));
 
     Channel<std::shared_ptr<ClientInputCommand>> interface_to_session_man;
     Channel<std::shared_ptr<ClientOutputNotice>> session_man_to_interface; 
@@ -67,6 +67,7 @@ int main(int argc, char const *argv[])
 
     session_main_receiver.disconnect();
     interface_receiver.disconnect();
+    socket->disconnect();
 
     return 0;
 }

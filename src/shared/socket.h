@@ -146,7 +146,8 @@ class ReliableSocket {
             public:
                 Address remote_address;
                 bool disconnecting;
-                uint64_t max_req_attemtps;
+                uint64_t max_req_attempts;
+                uint64_t max_disc_attempts;
                 uint64_t max_cached_sent_resps;
                 SeqnSet received_seqn_set;
                 std::queue<uint64_t> cached_sent_resp_queue;
@@ -156,7 +157,8 @@ class ReliableSocket {
                 Connection();
 
                 Connection(
-                    uint64_t max_req_attemtps,
+                    uint64_t max_req_attempts,
+                    uint64_t max_disc_attempts,
                     uint64_t max_cached_sent_resps,
                     Enveloped connect_request
                 );
@@ -166,6 +168,7 @@ class ReliableSocket {
             private:
                 Socket udp;
                 uint64_t max_req_attempts;
+                uint64_t max_disc_attempts;
                 uint64_t max_cached_sent_resps;
 
                 Channel<Enveloped>::Receiver handler_to_req_receiver;
@@ -177,6 +180,7 @@ class ReliableSocket {
                 Inner(
                     Socket&& udp,
                     uint64_t max_req_attempts,
+                    uint64_t max_disc_attempts,
                     uint64_t max_cached_sent_resps,
                     Channel<Enveloped>::Receiver&& handler_to_req_receiver
                 );
@@ -216,6 +220,7 @@ class ReliableSocket {
         class Config {
             public:
                 uint64_t max_req_attempts;
+                uint64_t max_disc_attempts;
                 uint64_t max_cached_sent_resps;
                 uint64_t bump_interval_nanos;
                 int poll_timeout_ms;
@@ -223,6 +228,7 @@ class ReliableSocket {
                 Config();
 
                 Config& with_max_req_attempts(uint64_t val);
+                Config& with_max_disc_attempts(uint64_t val);
                 Config& with_max_cached_sent_resps(uint64_t val);
                 Config& with_bump_interval_nanos(uint64_t val);
                 Config& with_poll_timeout_ms(int val);

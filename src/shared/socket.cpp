@@ -258,16 +258,18 @@ ReliableSocket::PendingResponse::PendingResponse(
 {
 }
 
-ReliableSocket::Connection::Connection() : Connection(10, 20, Enveloped())
+ReliableSocket::Connection::Connection() : Connection(32, 23, 20, Enveloped())
 {
 }
 
 ReliableSocket::Connection::Connection(
-    uint64_t max_req_attemtps,
+    uint64_t max_req_attempts,
+    uint64_t max_disc_attempts,
     uint64_t max_cached_sent_resps,
     Enveloped connect_request
 ) :
-    max_req_attemtps(max_req_attemtps),
+    max_req_attempts(max_req_attempts),
+    max_disc_attempts(max_disc_attempts),
     max_cached_sent_resps(max_cached_sent_resps),
     remote_address(connect_request.remote),
     disconnecting(false)
@@ -277,11 +279,13 @@ ReliableSocket::Connection::Connection(
 ReliableSocket::Inner::Inner(
     Socket&& udp,
     uint64_t max_req_attempts,
+    uint64_t max_disc_attempts,
     uint64_t max_cached_sent_resps,
     Channel<Enveloped>::Receiver&& handler_to_req_receiver
 ) :
     udp(std::move(udp)),
     max_req_attempts(max_req_attempts),
+    max_disc_attempts(max_disc_attempts),
     max_cached_sent_resps(max_cached_sent_resps),
     handler_to_req_receiver(handler_to_req_receiver)
 {
@@ -324,6 +328,7 @@ void ReliableSocket::Inner::unsafe_send_req(
                     enveloped.remote,
                     Connection(
                         this->max_req_attempts,
+                        this->max_disc_attempts,
                         this->max_cached_sent_resps,
                         enveloped
                     )
@@ -357,9 +362,11 @@ void ReliableSocket::Inner::unsafe_send_req(
     Connection& connection = this->connections[enveloped.remote];
 
     bool was_disconnecting = false;
+    uint64_t max_req_attempts = this->max_req_attempts;
     if (enveloped.message.body->tag().type == MSG_DISCONNECT) {
         was_disconnecting = connection.disconnecting;
         connection.disconnecting = true;
+        max_req_attempts = std::min(max_req_attempts, this->max_disc_attempts);
     }
 
     if (!was_disconnecting || callback.has_value()) {
@@ -367,7 +374,7 @@ void ReliableSocket::Inner::unsafe_send_req(
             enveloped.message.header.seqn, 
             PendingResponse(
                 enveloped,
-                this->max_req_attempts,
+                max_req_attempts,
                 std::move(callback)
             )
         ));
@@ -454,6 +461,7 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
                     enveloped.remote,
                     Connection(
                         this->max_req_attempts,
+                        this->max_disc_attempts,
                         this->max_cached_sent_resps,
                         enveloped
                     )
@@ -596,7 +604,8 @@ void ReliableSocket::Inner::disconnect()
 }
 
 ReliableSocket::Config::Config() :
-    max_req_attempts(24),
+    max_req_attempts(32),
+    max_disc_attempts(23),
     max_cached_sent_resps(100),
     bump_interval_nanos(10 * 1000),
     poll_timeout_ms(10)
@@ -608,6 +617,14 @@ ReliableSocket::Config& ReliableSocket::Config::with_max_req_attempts(
 )
 {
     this->max_req_attempts = val;
+    return *this;
+}
+
+ReliableSocket::Config& ReliableSocket::Config::with_max_disc_attempts(
+    uint64_t val
+)
+{
+    this->max_disc_attempts = val;
     return *this;
 }
 
@@ -788,6 +805,7 @@ ReliableSocket::ReliableSocket(
         std::shared_ptr<Inner>(new Inner(
             std::move(udp),
             config.max_req_attempts,
+            config.max_disc_attempts,
             config.max_cached_sent_resps,
             std::move(handler_to_recv_req_channel.receiver)
         )),

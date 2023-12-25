@@ -27,7 +27,7 @@ void start_client_session_manager(
     ThreadTracker& thread_tracker,
     Username const& username,
     Address server_addr,
-    ReliableSocket&& reliable_socket,
+    std::shared_ptr<ReliableSocket> const& socket,
     Channel<std::shared_ptr<ClientOutputNotice>>::Sender&& to_interface,
     Channel<std::shared_ptr<ClientInputCommand>>::Receiver&& from_interface
 );
