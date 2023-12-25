@@ -596,7 +596,7 @@ void ReliableSocket::Inner::disconnect()
 }
 
 ReliableSocket::Config::Config() :
-    max_req_attempts(32),
+    max_req_attempts(24),
     max_cached_sent_resps(100),
     bump_interval_nanos(10 * 1000),
     poll_timeout_ms(10)
