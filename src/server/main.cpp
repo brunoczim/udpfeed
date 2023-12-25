@@ -19,6 +19,8 @@ Arguments parse_arguments(int argc, char const *argv[]);
 
 int main(int argc, char const *argv[])
 {
+    using namespace std::chrono_literals;
+
     Arguments arguments = parse_arguments(argc, argv);
 
     std::ios::sync_with_stdio();
@@ -95,7 +97,8 @@ int main(int argc, char const *argv[])
     prof_receiver.disconnect();
     comm_receiver.disconnect();
     notif_receiver.disconnect();
-    socket->disconnect();
+
+    socket->disconnect_timeout(50 * 1000 * 1000, 10);
 
     thread_tracker.join_all();
 

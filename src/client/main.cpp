@@ -19,6 +19,8 @@ Arguments parse_arguments(int argc, char const *argv[]);
 
 int main(int argc, char const *argv[])
 {
+    using namespace std::chrono_literals;
+
     Arguments arguments = parse_arguments(argc, argv);
 
     std::ios::sync_with_stdio();
@@ -32,7 +34,7 @@ int main(int argc, char const *argv[])
             << " with username "
             << arguments.username.content()
             << std::endl
-            << "Press Ctrl-C or Ctrl-D to disconnect"
+            << "Press Ctrl-C or Ctrl-D to quit"
             << std::endl;
     });
 
@@ -65,9 +67,14 @@ int main(int argc, char const *argv[])
 
     wait_for_graceful_shutdown(SHUTDOWN_PASSIVE_EOF);
 
+    Logger::with([] (auto& output) {
+        output << std::endl << "Quitting..." << std::endl;
+    });
+
     session_main_receiver.disconnect();
     interface_receiver.disconnect();
-    socket->disconnect();
+
+    socket->disconnect_timeout(50 * 1000 * 1000, 10);
 
     return 0;
 }
