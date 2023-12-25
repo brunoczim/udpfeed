@@ -316,12 +316,41 @@ void ReliableSocket::Inner::unsafe_send_req(
 {
     enveloped.message.header.fill_req();
 
-    if (enveloped.message.body->tag().type == MSG_CONNECT) { 
-        this->connections.insert(std::make_pair(enveloped.remote, Connection(
-            this->max_req_attempts,
-            this->max_cached_sent_resps,
-            enveloped
-        )));
+    if (this->connections.find(enveloped.remote) == this->connections.end()) {
+        switch (enveloped.message.body->tag().type) {
+            case MSG_CONNECT:
+                this->connections.insert(std::make_pair(
+                    enveloped.remote,
+                    Connection(
+                        this->max_req_attempts,
+                        this->max_cached_sent_resps,
+                        enveloped
+                    )
+                ));
+                break;
+            case MSG_DISCONNECT: {
+                Enveloped response;
+                response.remote = enveloped.remote;
+                response.message.header.fill_resp(
+                    enveloped.message.header.seqn
+                );
+                response.message.body = std::shared_ptr<MessageBody>(
+                    new MessageDisconnectResp
+                );
+                std::optional<Channel<Enveloped>::Sender> moved_callback
+                    = std::move(callback);
+                if (moved_callback) {
+                    moved_callback->send(response);
+                }
+                return;
+            }
+        }
+    }
+
+    if (
+        enveloped.message.body->tag().type == MSG_CONNECT
+        && this->connections.find(enveloped.remote) == this->connections.end()
+    ) { 
     }
 
     Connection& connection = this->connections[enveloped.remote];
@@ -562,6 +591,7 @@ void ReliableSocket::Inner::disconnect()
             std::optional<Channel<Enveloped>::Sender>()
         );
     }
+    this->connections.clear();
 }
 
 ReliableSocket::Config::Config() :
