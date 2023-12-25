@@ -141,10 +141,10 @@ template <typename T>
 void Channel<T>::Inner::sender_disconnected()
 {
     std::unique_lock lock(this->mutex);
-    if (this->receivers > 0) {
+    if (this->senders > 0) {
         this->senders--;
     }
-    if (this->senders == 0) {
+    if (this->senders == 0 || this->receivers == 0) {
         this->cond_var.notify_all();
     }
 }
@@ -162,7 +162,8 @@ void Channel<T>::Inner::receiver_disconnected()
     std::unique_lock lock(this->mutex);
     if (this->receivers > 0) {
         this->receivers--;
-    } else {
+    }
+    if (this->senders == 0 || this->receivers == 0) {
         this->cond_var.notify_all();
     }
 }

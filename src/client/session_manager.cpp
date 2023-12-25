@@ -218,6 +218,7 @@ void start_client_session_manager(
                             Logger::with([] (auto& output) {
                                 output << "Server disconnected" << std::endl;
                             });
+                            socket->disconnect();
                             break;
                         }
                     }
