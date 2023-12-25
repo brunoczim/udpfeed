@@ -250,7 +250,7 @@ ReliableSocket::PendingResponse::PendingResponse(
     std::optional<Channel<Enveloped>::Sender>&& callback
 ) :
     request(enveloped),
-    cooldown_exp(1),
+    cooldown_attempt(0),
     cooldown_counter(1),
     remaining_attempts(max_req_attempts),
     callback(callback)
@@ -514,10 +514,7 @@ void ReliableSocket::Inner::bump()
             PendingResponse& pending = std::get<1>(pending_entry);
 
             if (pending.cooldown_counter == 0) {
-                if (
-                    pending.remaining_attempts == 0
-                    || pending.cooldown_exp == 0
-                ) {
+                if (pending.remaining_attempts == 0) {
                     seqn_to_be_removed.insert(seqn);
                     switch (pending.request.message.body->tag().type) {
                         case MSG_DISCONNECT:
@@ -529,12 +526,15 @@ void ReliableSocket::Inner::bump()
                     pending.remaining_attempts--;
                     this->udp.send(pending.request);
                 }
-                pending.cooldown_counter = 1 << (pending.cooldown_exp / 3);
-                pending.cooldown_exp++;
+
+                pending.cooldown_attempt++;
+                uint64_t exponent = pending.cooldown_attempt * 11 / 16;
+                pending.cooldown_counter = 1 << exponent;
             } else {
                 pending.cooldown_counter--;
             }
         }
+
         for (uint64_t const& seqn : seqn_to_be_removed) {
             connection.pending_responses.erase(seqn);
         }
@@ -567,7 +567,7 @@ void ReliableSocket::Inner::disconnect()
 }
 
 ReliableSocket::Config::Config() :
-    max_req_attempts(16),
+    max_req_attempts(32),
     max_cached_sent_resps(100),
     bump_interval_nanos(10 * 1000),
     poll_timeout_ms(10)
