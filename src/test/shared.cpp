@@ -22,10 +22,12 @@ static TestSuite thread_tracker_test_suite();
 static TestSuite username_test_suite();
 static TestSuite notif_message_test_suite();
 static TestSuite string_ext_test_suite();
+static TestSuite seqn_set_test_suite();
 
 TestSuite shared_test_suite()
 {
     return TestSuite()
+        .append(seqn_set_test_suite())
         .append(parse_udp_port_test_suite())
         .append(parse_ipv4_test_suite())
         .append(plaintext_ser_test_suite())
@@ -591,6 +593,44 @@ static TestSuite socket_test_suite()
 static TestSuite channel_test_suite()
 {
     return TestSuite()
+        .test("channel with no message", [] {
+            Channel<uint64_t> channel;
+            Channel<uint64_t>::Sender sender = std::move(channel.sender);
+            Channel<uint64_t>::Receiver receiver = std::move(channel.receiver);
+            constexpr uint64_t total_messages = 0;
+            std::thread sender_thread ([sender = std::move(sender)] () mutable {
+                sender.disconnect();
+            });
+
+            bool disconnected = false;
+
+            uint64_t message_count = 0;
+
+            while (!disconnected) {
+                try {
+                    uint64_t message = receiver.receive();
+                    TEST_ASSERT(
+                        std::string("message should be ")
+                            + std::to_string(message_count)
+                            + ", found "
+                            + std::to_string(message),
+                        message == message_count
+                    );
+                    message_count++;
+                } catch (SendersDisconnected const& exc) {
+                    disconnected = true;
+                }
+            }
+
+            sender_thread.join();
+
+            TEST_ASSERT(
+                std::string("found actual message count to be ")
+                    + std::to_string(message_count),
+                message_count == total_messages
+            );
+        })
+
         .test("single producer, single consumer, sender ends first", [] {
             Channel<uint64_t> channel;
             Channel<uint64_t>::Sender sender = std::move(channel.sender);
@@ -1186,6 +1226,177 @@ static TestSuite string_ext_test_suite()
             TEST_ASSERT(
                 "should not start with",
                 !string_starts_with_ignore_case(haystack, needle)
+            );
+        })
+    ;
+}
+
+static TestSuite seqn_set_test_suite()
+{
+    return TestSuite()
+        .test("initial receive zero twice", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should receive",
+                set.receive(0)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(0)
+            );
+        })
+        .test("initial receive two twice", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should receive",
+                set.receive(2)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(2)
+            );
+        })
+        .test("mix two and zero", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should receive",
+                set.receive(0)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(2)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(0)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(2)
+            );
+        })
+
+        .test("mix zero and two", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should receive",
+                set.receive(2)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(0)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(2)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(0)
+            );
+        })
+
+        .test("merge zero and one and two", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should receive",
+                set.receive(2)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(0)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(1)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(1)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(2)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(0)
+            );
+        })
+
+        .test("receive many", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should receive",
+                set.receive(2)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(6)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(4)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(3)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(7)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(5)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(2)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(3)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(4)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(5)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(6)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(7)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(9)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(9)
+            );
+            TEST_ASSERT(
+                "should receive",
+                set.receive(8)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(8)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(9)
+            );
+            TEST_ASSERT(
+                "should not receive",
+                !set.receive(3)
             );
         })
     ;

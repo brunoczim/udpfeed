@@ -268,7 +268,6 @@ ReliableSocket::Connection::Connection(
 ) :
     max_req_attemtps(max_req_attemtps),
     max_cached_sent_resps(max_cached_sent_resps),
-    min_accepted_req_seqn(0),
     remote_address(connect_request.remote),
     disconnecting(false)
 {
@@ -469,9 +468,8 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
         Enveloped response = std::get<1>(*resp_search);
         this->udp.send(response);
     } else if (
-        connection.min_accepted_req_seqn <= enveloped.message.header.seqn
+        connection.received_seqn_set.receive(enveloped.message.header.seqn)
     ) {
-        connection.min_accepted_req_seqn = enveloped.message.header.seqn + 1;
         return std::make_optional(enveloped);
     }
 

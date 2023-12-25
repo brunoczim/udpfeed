@@ -11,6 +11,7 @@
 #include "message.h"
 #include "address.h"
 #include "channel.h"
+#include "seqn_set.h"
 
 class SocketError : public std::exception {};
 
@@ -147,7 +148,7 @@ class ReliableSocket {
                 bool disconnecting;
                 uint64_t max_req_attemtps;
                 uint64_t max_cached_sent_resps;
-                uint64_t min_accepted_req_seqn;
+                SeqnSet received_seqn_set;
                 std::queue<uint64_t> cached_sent_resp_queue;
                 std::map<uint64_t, Enveloped> cached_sent_resps;
                 std::map<uint64_t, PendingResponse> pending_responses;
