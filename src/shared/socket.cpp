@@ -1,4 +1,5 @@
 #include "socket.h"
+#include "log.h"
 #include <cerrno>
 #include <cstring>
 #include <unistd.h>
@@ -739,10 +740,12 @@ ReliableSocket::ReliableSocket(
                         connected = false;
                     }
                 } catch (DeserializationError const& exc) {
-                    std::cerr
-                        << "failed to deserialize a packet: "
-                        << exc.what()
-                        << std::endl;
+                    Logger::with([&exc] (auto& output) {
+                        output
+                            << "failed to deserialize a packet: "
+                            << exc.what()
+                            << std::endl;
+                    });
                 }
             }
         } catch (ChannelDisconnected const& exc) {

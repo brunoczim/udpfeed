@@ -49,7 +49,9 @@ void start_client_interface(
                                     new ClientFollowCommand(username)
                                 ));
                         } catch (InvalidUsername const& exc) {
-                            std::cerr << exc.what() << std::endl;
+                            Logger::with([&exc] (auto& output) {
+                                output << exc.what() << std::endl;
+                            });
                         }
                     } else if (string_starts_with_ignore_case(line, send_cmd)) {
                         try {
