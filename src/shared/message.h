@@ -85,6 +85,7 @@ enum MessageType {
     MSG_ERROR,
     MSG_CONNECT,
     MSG_DISCONNECT,
+    MSG_PING,
     MSG_FOLLOW,
     MSG_NOTIFY,
     MSG_DELIVER
@@ -206,6 +207,22 @@ class MessageDisconnectReq : public MessageBody {
 };
 
 class MessageDisconnectResp : public MessageBody {
+    public:
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessagePingReq : public MessageBody {
+    public:
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessagePingResp : public MessageBody {
     public:
         virtual MessageTag tag() const;
 

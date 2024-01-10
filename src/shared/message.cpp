@@ -67,6 +67,7 @@ MessageType msg_type_from_code(uint16_t code)
         case MSG_ERROR: return MSG_ERROR;
         case MSG_CONNECT: return MSG_CONNECT;
         case MSG_DISCONNECT: return MSG_DISCONNECT;
+        case MSG_PING: return MSG_PING;
         case MSG_FOLLOW: return MSG_FOLLOW;
         case MSG_NOTIFY: return MSG_NOTIFY;
         case MSG_DELIVER: return MSG_DELIVER;
@@ -359,6 +360,32 @@ void MessageDisconnectResp::serialize(Serializer& serializer) const
 }
 
 void MessageDisconnectResp::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageTag MessagePingReq::tag() const
+{
+    return MessageTag(MSG_REQ, MSG_PING);
+}
+
+void MessagePingReq::serialize(Serializer& serializer) const
+{
+}
+
+void MessagePingReq::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageTag MessagePingResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_PING);
+}
+
+void MessagePingResp::serialize(Serializer& serializer) const
+{
+}
+
+void MessagePingResp::deserialize(Deserializer& deserializer)
 {
 }
 
