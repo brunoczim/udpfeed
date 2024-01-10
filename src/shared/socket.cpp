@@ -1,5 +1,6 @@
 #include "socket.h"
 #include "log.h"
+#include "time.h"
 #include <cerrno>
 #include <cstring>
 #include <unistd.h>
@@ -278,6 +279,11 @@ ReliableSocket::Inner::Inner(
     config(config),
     handler_to_req_receiver(std::move(handler_to_req_receiver))
 {
+}
+
+ReliableSocket::Config const& ReliableSocket::Inner::used_config() const
+{
+    return this->config;
 }
 
 bool ReliableSocket::Inner::is_connected()
@@ -577,7 +583,9 @@ std::vector<Enveloped> ReliableSocket::Inner::bump()
                 }
 
                 pending.cooldown_attempt++;
-                uint64_t exponent = pending.cooldown_attempt * 11 / 16;
+                uint64_t exponent = pending.cooldown_attempt;
+                exponent *= this->config.req_cooldown_numer;
+                exponent /= this->config.req_cooldown_denom;
                 pending.cooldown_counter = 1 << exponent;
             } else {
                 pending.cooldown_counter--;
@@ -594,15 +602,19 @@ std::vector<Enveloped> ReliableSocket::Inner::bump()
         if (connection.disconnect_counter > this->config.max_disconnect_count) {
             addresses_to_be_removed.insert(address);
         } else if (
-            connection.disconnect_counter % this->config.ping_count == 0
+            connection.disconnect_counter >= this->config.ping_start == 0
         ) {
-            Enveloped ping_request;
-            ping_request.remote = address;
-            ping_request.message.body = std::shared_ptr<MessageBody>(
-                new MessagePingReq
-            );
-            ping_request.message.header.fill_req();
-            this->udp.send(ping_request);
+            uint64_t offset =
+                connection.disconnect_counter - this->config.ping_start;
+            if (offset % this->config.ping_interval == 0) {
+                Enveloped ping_request;
+                ping_request.remote = address;
+                ping_request.message.body = std::shared_ptr<MessageBody>(
+                    new MessagePingReq
+                );
+                ping_request.message.header.fill_req();
+                this->udp.send(ping_request);
+            }
         }
     }
 
@@ -637,13 +649,32 @@ void ReliableSocket::Inner::disconnect()
 }
 
 ReliableSocket::Config::Config() :
+    req_cooldown_numer(11),
+    req_cooldown_denom(16),
     max_req_attempts(23),
     max_cached_sent_resps(100),
     bump_interval_nanos(250 * 1000),
     max_disconnect_count(5000),
-    ping_count(1000),
+    ping_start(1000),
+    ping_interval(500),
     poll_timeout_ms(10)
 {
+}
+
+ReliableSocket::Config& ReliableSocket::Config::with_req_cooldown_numer(
+    uint64_t val
+)
+{
+    this->req_cooldown_numer = val;
+    return *this;
+}
+
+ReliableSocket::Config& ReliableSocket::Config::with_req_cooldown_denom(
+    uint64_t val
+)
+{
+    this->req_cooldown_denom = val;
+    return *this;
 }
 
 ReliableSocket::Config& ReliableSocket::Config::with_max_req_attempts(
@@ -678,11 +709,19 @@ ReliableSocket::Config& ReliableSocket::Config::with_max_disconnect_count(
     return *this;
 }
 
-ReliableSocket::Config& ReliableSocket::Config::with_ping_count(
+ReliableSocket::Config& ReliableSocket::Config::with_ping_start(
     uint64_t val
 )
 {
-    this->ping_count = val;
+    this->ping_start = val;
+    return *this;
+}
+
+ReliableSocket::Config& ReliableSocket::Config::with_ping_interval(
+    uint64_t val
+)
+{
+    this->ping_interval = val;
     return *this;
 }
 
@@ -690,6 +729,44 @@ ReliableSocket::Config& ReliableSocket::Config::with_poll_timeout_ms(int val)
 {
     this->poll_timeout_ms = val;
     return *this;
+}
+
+uint64_t ReliableSocket::Config::min_response_timeout_ns() const
+{
+    uint64_t nanos = 0;
+
+    for (uint64_t i = 0; i <= this->max_req_attempts; i++) {
+        nanos += 1 << (i * this->req_cooldown_numer / this->req_cooldown_denom);
+    }
+
+    return nanos * this->bump_interval_nanos;
+}
+
+uint64_t ReliableSocket::Config::min_ping_timeout_ns() const
+{
+    return this->bump_interval_nanos * this->max_disconnect_count;
+}
+
+void ReliableSocket::Config::report(std::ostream& stream) const
+{
+    ReportTime min_response_timeout_ns(
+        this->min_response_timeout_ns(),
+        ReportTime::NS
+    );
+    ReportTime min_ping_timeout_ns(
+        this->min_ping_timeout_ns(),
+        ReportTime::NS
+    );
+    stream
+        << "Using configuration with:"
+        << std::endl
+        << "- minimum timeout for responses: "
+        << min_response_timeout_ns.to_string()
+        << std::endl
+        << "- minimum timeout before disconnecting: "
+        << min_ping_timeout_ns.to_string()
+        << std::endl
+    ;
 }
 
 ReliableSocket::SentReq::SentReq(
@@ -923,6 +1000,11 @@ void ReliableSocket::close()
         this->handler_thread.join();
         this->bumper_thread.join();
     }
+}
+
+ReliableSocket::Config const& ReliableSocket::config() const
+{
+    return this->inner->used_config();
 }
 
 ReliableSocket::SentReq ReliableSocket::send_req(Enveloped enveloped)

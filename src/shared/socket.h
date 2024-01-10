@@ -129,21 +129,32 @@ class ReliableSocket {
     public:
         class Config {
             public:
+                uint64_t req_cooldown_numer;
+                uint64_t req_cooldown_denom;
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
                 uint64_t bump_interval_nanos;
                 uint64_t max_disconnect_count;
-                uint64_t ping_count;
+                uint64_t ping_start;
+                uint64_t ping_interval;
                 int poll_timeout_ms;
 
                 Config();
 
+                Config& with_req_cooldown_numer(uint64_t val);
+                Config& with_req_cooldown_denom(uint64_t val);
                 Config& with_max_req_attempts(uint64_t val);
                 Config& with_max_cached_sent_resps(uint64_t val);
                 Config& with_bump_interval_nanos(uint64_t val);
                 Config& with_max_disconnect_count(uint64_t val);
-                Config& with_ping_count(uint64_t ping_count);
+                Config& with_ping_start(uint64_t ping_start);
+                Config& with_ping_interval(uint64_t ping_interval);
                 Config& with_poll_timeout_ms(int val);
+
+                uint64_t min_response_timeout_ns() const;
+                uint64_t min_ping_timeout_ns() const;
+
+                void report(std::ostream& stream) const;
         };
 
     private:
@@ -193,6 +204,8 @@ class ReliableSocket {
                     Config const& config,
                     Channel<Enveloped>::Receiver&& handler_to_req_receiver
                 );
+
+                Config const& used_config() const;
 
                 bool is_connected();
 
@@ -305,6 +318,8 @@ class ReliableSocket {
             Socket&& udp,
             Config const& config = Config()
         );
+
+        Config const& config() const;
 
         ReliableSocket(ReliableSocket&& other);
         ReliableSocket& operator=(ReliableSocket&& other);
