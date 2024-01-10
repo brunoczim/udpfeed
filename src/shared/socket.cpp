@@ -498,6 +498,19 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
                 return std::optional<Enveloped>();
             }
 
+            case MSG_PING: {
+                Enveloped response;
+                response.remote = enveloped.remote;
+                response.message.header.fill_resp(
+                    enveloped.message.header.seqn
+                );
+                response.message.body = std::shared_ptr<MessageBody>(
+                    new MessagePingResp
+                );
+                this->udp.send(response);
+                return std::optional<Enveloped>();
+            }
+
             default: {
                 Enveloped response;
                 response.remote = enveloped.remote;
@@ -599,7 +612,7 @@ std::vector<Enveloped> ReliableSocket::Inner::bump()
 
         if (connection.disconnect_counter > this->max_disconnect_count) {
             addresses_to_be_removed.insert(address);
-        } else if (connection.disconnect_counter > this->ping_count) {
+        } else if (connection.disconnect_counter >= this->ping_count) {
             Enveloped ping_request;
             ping_request.remote = address;
             ping_request.message.body = std::shared_ptr<MessageBody>(
