@@ -472,6 +472,20 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
     Enveloped enveloped
 )
 {
+    if (enveloped.message.body->tag().type == MSG_PING) {
+        Enveloped response;
+        response.remote = enveloped.remote;
+        response.message.header.fill_resp(
+            enveloped.message.header.seqn
+        );
+        response.message.body = std::shared_ptr<MessageBody>(
+            new MessagePingResp
+        );
+        this->udp.send(response);
+        return std::optional<Enveloped>();
+    }
+
+
     if (this->connections.find(enveloped.remote) == this->connections.end()) {
         switch (enveloped.message.body->tag().type) {
             case MSG_CONNECT:
@@ -493,19 +507,6 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
                 );
                 response.message.body = std::shared_ptr<MessageBody>(
                     new MessageDisconnectResp
-                );
-                this->udp.send(response);
-                return std::optional<Enveloped>();
-            }
-
-            case MSG_PING: {
-                Enveloped response;
-                response.remote = enveloped.remote;
-                response.message.header.fill_resp(
-                    enveloped.message.header.seqn
-                );
-                response.message.body = std::shared_ptr<MessageBody>(
-                    new MessagePingResp
                 );
                 this->udp.send(response);
                 return std::optional<Enveloped>();
