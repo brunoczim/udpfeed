@@ -414,6 +414,18 @@ void ReliableSocket::Inner::unsafe_send_resp(Enveloped enveloped)
     this->udp.send(enveloped);
 }
 
+Enveloped ReliableSocket::Inner::unsafe_forceful_disconnect(Address remote)
+{
+    this->connections.erase(remote);
+    Enveloped fake_req;
+    fake_req.remote = remote;
+    fake_req.message.body = std::shared_ptr<MessageBody>(
+        new MessageDisconnectReq
+    );
+    fake_req.message.header.fill_req();
+    return fake_req;
+}
+
 std::optional<Enveloped> ReliableSocket::Inner::receive_raw(int poll_timeout_ms)
 {
     while (this->is_connected()) {
@@ -540,9 +552,11 @@ void ReliableSocket::Inner::unsafe_handle_resp(Enveloped enveloped)
     }
 }
 
-void ReliableSocket::Inner::bump()
+std::vector<Enveloped> ReliableSocket::Inner::bump()
 {
     std::unique_lock lock(this->net_control_mutex);
+
+    std::vector<Enveloped> fake_disconnect_reqs;
 
     std::set<uint64_t> seqn_to_be_removed;
     std::set<Address> addresses_to_be_removed;
@@ -596,9 +610,13 @@ void ReliableSocket::Inner::bump()
         }
     }
 
-    for (Address const& address : addresses_to_be_removed) {
-        this->connections.erase(address);
+    for (Address address : addresses_to_be_removed) {
+        fake_disconnect_reqs.push_back(
+            this->unsafe_forceful_disconnect(address)
+        );
     }
+
+    return fake_disconnect_reqs;
 }
 
 void ReliableSocket::Inner::disconnect()
@@ -773,7 +791,7 @@ ReliableSocket::ReliableSocket(
     input_thread([
         inner,
         poll_timeout_ms,
-        channel = std::move(input_to_handler_channel.sender)
+        channel = input_to_handler_channel.sender
     ] () mutable {
         try {
             bool connected = true;
@@ -813,11 +831,21 @@ ReliableSocket::ReliableSocket(
         }
     }),
 
-    bumper_thread([inner, bump_interval_nanos] () mutable {
-        std::chrono::nanoseconds interval(bump_interval_nanos);
-        while (inner->is_connected()) {
-            std::this_thread::sleep_for(interval);
-            inner->bump();
+    bumper_thread([
+        inner,
+        bump_interval_nanos,
+        channel = std::move(input_to_handler_channel.sender)
+    ] () mutable {
+        try {
+            std::chrono::nanoseconds interval(bump_interval_nanos);
+            while (inner->is_connected()) {
+                std::this_thread::sleep_for(interval);
+                std::vector<Enveloped> fake_disconnnect_reqs = inner->bump();
+                for (auto enveloped : fake_disconnnect_reqs) {
+                    channel.send(enveloped);
+                }
+            }
+        } catch (ChannelDisconnected const& exc) {
         }
     })
 {

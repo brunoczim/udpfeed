@@ -540,6 +540,10 @@ void Message::deserialize(Deserializer& deserializer)
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageDisconnectReq);
                     break;
+                case MSG_PING:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessagePingReq);
+                    break;
                 case MSG_FOLLOW:
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageFollowReq);
@@ -567,6 +571,10 @@ void Message::deserialize(Deserializer& deserializer)
                 case MSG_DISCONNECT:
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageDisconnectResp);
+                    break;
+                case MSG_PING:
+                    this->body =
+                        std::shared_ptr<MessageBody>(new MessagePingResp);
                     break;
                 case MSG_FOLLOW:
                     this->body =

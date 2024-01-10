@@ -202,6 +202,8 @@ class ReliableSocket {
 
                 void unsafe_send_resp(Enveloped enveloped);
 
+                Enveloped unsafe_forceful_disconnect(Address remote);
+
                 std::optional<Enveloped> receive_raw(int poll_timeout_ms);
 
                 Enveloped receive();
@@ -212,7 +214,7 @@ class ReliableSocket {
 
                 void unsafe_handle_resp(Enveloped enveloped);
 
-                void bump();
+                std::vector<Enveloped> bump();
 
                 void disconnect();
         };
