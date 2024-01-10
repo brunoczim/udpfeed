@@ -805,7 +805,7 @@ ReliableSocket::ReliableSocket(
     input_thread([
         inner,
         poll_timeout_ms,
-        channel = input_to_handler_channel.sender
+        channel = std::move(input_to_handler_channel.sender)
     ] () mutable {
         try {
             bool connected = true;
@@ -832,7 +832,7 @@ ReliableSocket::ReliableSocket(
     handler_thread([
         inner,
         from_input = std::move(input_to_handler_channel.receiver),
-        to_req_receiver = std::move(handler_to_req_receiver)
+        to_req_receiver = handler_to_req_receiver
     ] () mutable {
         try {
             for (;;) {
@@ -848,14 +848,13 @@ ReliableSocket::ReliableSocket(
     bumper_thread([
         inner,
         bump_interval_nanos,
-        channel = std::move(input_to_handler_channel.sender)
+        channel = std::move(handler_to_req_receiver)
     ] () mutable {
         try {
             std::chrono::nanoseconds interval(bump_interval_nanos);
             while (inner->is_connected()) {
                 std::this_thread::sleep_for(interval);
-                std::vector<Enveloped> fake_disconnnect_reqs = inner->bump();
-                for (auto enveloped : fake_disconnnect_reqs) {
+                for (auto enveloped : inner->bump()) {
                     channel.send(enveloped);
                 }
             }
@@ -903,6 +902,7 @@ ReliableSocket::ReliableSocket(
 
 ReliableSocket::ReliableSocket(ReliableSocket&& other) :
     inner(std::move(other.inner)),
+
     input_thread(std::move(other.input_thread)),
     handler_thread(std::move(other.handler_thread)),
     bumper_thread(std::move(other.bumper_thread))
