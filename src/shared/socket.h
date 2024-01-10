@@ -126,6 +126,26 @@ class MissedResponse : public std::exception {
  *  - users sends responses directly without callback through 'send_resp'
  */
 class ReliableSocket {
+    public:
+        class Config {
+            public:
+                uint64_t max_req_attempts;
+                uint64_t max_cached_sent_resps;
+                uint64_t bump_interval_nanos;
+                uint64_t max_disconnect_count;
+                uint64_t ping_count;
+                int poll_timeout_ms;
+
+                Config();
+
+                Config& with_max_req_attempts(uint64_t val);
+                Config& with_max_cached_sent_resps(uint64_t val);
+                Config& with_bump_interval_nanos(uint64_t val);
+                Config& with_max_disconnect_count(uint64_t val);
+                Config& with_ping_count(uint64_t ping_count);
+                Config& with_poll_timeout_ms(int val);
+        };
+
     private:
         class PendingResponse {
             public:
@@ -147,8 +167,6 @@ class ReliableSocket {
                 Address remote_address;
                 uint64_t disconnect_counter;
                 bool disconnecting;
-                uint64_t max_req_attempts;
-                uint64_t max_cached_sent_resps;
                 SeqnSet received_seqn_set;
                 std::queue<uint64_t> cached_sent_resp_queue;
                 std::map<uint64_t, Enveloped> cached_sent_resps;
@@ -156,20 +174,13 @@ class ReliableSocket {
 
                 Connection();
 
-                Connection(
-                    uint64_t max_req_attempts,
-                    uint64_t max_cached_sent_resps,
-                    Enveloped connect_request
-                );
+                Connection(Enveloped connect_request);
         };
 
         class Inner {
             private:
                 Socket udp;
-                uint64_t max_req_attempts;
-                uint64_t max_cached_sent_resps;
-                uint64_t max_disconnect_count;
-                uint64_t ping_count;
+                Config config;
 
                 Channel<Enveloped>::Receiver handler_to_req_receiver;
 
@@ -179,10 +190,7 @@ class ReliableSocket {
             public:
                 Inner(
                     Socket&& udp,
-                    uint64_t max_req_attempts,
-                    uint64_t max_cached_sent_resps,
-                    uint64_t max_disconnect_count,
-                    uint64_t ping_count,
+                    Config const& config,
                     Channel<Enveloped>::Receiver&& handler_to_req_receiver
                 );
 
@@ -220,25 +228,6 @@ class ReliableSocket {
         };
 
     public:
-        class Config {
-            public:
-                uint64_t max_req_attempts;
-                uint64_t max_cached_sent_resps;
-                uint64_t bump_interval_nanos;
-                uint64_t max_disconnect_count;
-                uint64_t ping_count;
-                int poll_timeout_ms;
-
-                Config();
-
-                Config& with_max_req_attempts(uint64_t val);
-                Config& with_max_cached_sent_resps(uint64_t val);
-                Config& with_bump_interval_nanos(uint64_t val);
-                Config& with_max_disconnect_count(uint64_t val);
-                Config& with_ping_count(uint64_t ping_count);
-                Config& with_poll_timeout_ms(int val);
-        };
-
         class SentReq {
             private:
                 friend ReliableSocket;
@@ -296,15 +285,14 @@ class ReliableSocket {
 
         ReliableSocket(
             std::shared_ptr<ReliableSocket::Inner> inner,
-            uint64_t bump_interval_nanos,
-            int poll_timeout_ms,
+            Config const& config,
             Channel<Enveloped>&& input_to_handler_channel,
             Channel<Enveloped>::Sender&& handler_to_req_receiver
         );
 
         ReliableSocket(
             Socket&& udp,
-            Config config,
+            Config const& config,
             Channel<Enveloped>&& input_to_handler_channel,
             Channel<Enveloped>&& handler_to_recv_req_channel
         );
@@ -315,7 +303,7 @@ class ReliableSocket {
     public:
         ReliableSocket(
             Socket&& udp,
-            Config config = Config()
+            Config const& config = Config()
         );
 
         ReliableSocket(ReliableSocket&& other);
