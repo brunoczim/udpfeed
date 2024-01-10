@@ -594,15 +594,19 @@ std::vector<Enveloped> ReliableSocket::Inner::bump()
         if (connection.disconnect_counter > this->config.max_disconnect_count) {
             addresses_to_be_removed.insert(address);
         } else if (
-            connection.disconnect_counter % this->config.ping_count == 0
+            connection.disconnect_counter >= this->config.ping_start == 0
         ) {
-            Enveloped ping_request;
-            ping_request.remote = address;
-            ping_request.message.body = std::shared_ptr<MessageBody>(
-                new MessagePingReq
-            );
-            ping_request.message.header.fill_req();
-            this->udp.send(ping_request);
+            uint64_t offset =
+                connection.disconnect_counter - this->config.ping_start;
+            if (offset % this->config.ping_interval == 0) {
+                Enveloped ping_request;
+                ping_request.remote = address;
+                ping_request.message.body = std::shared_ptr<MessageBody>(
+                    new MessagePingReq
+                );
+                ping_request.message.header.fill_req();
+                this->udp.send(ping_request);
+            }
         }
     }
 
@@ -641,7 +645,8 @@ ReliableSocket::Config::Config() :
     max_cached_sent_resps(100),
     bump_interval_nanos(250 * 1000),
     max_disconnect_count(5000),
-    ping_count(1000),
+    ping_start(1000),
+    ping_interval(500),
     poll_timeout_ms(10)
 {
 }
@@ -678,11 +683,19 @@ ReliableSocket::Config& ReliableSocket::Config::with_max_disconnect_count(
     return *this;
 }
 
-ReliableSocket::Config& ReliableSocket::Config::with_ping_count(
+ReliableSocket::Config& ReliableSocket::Config::with_ping_start(
     uint64_t val
 )
 {
-    this->ping_count = val;
+    this->ping_start = val;
+    return *this;
+}
+
+ReliableSocket::Config& ReliableSocket::Config::with_ping_interval(
+    uint64_t val
+)
+{
+    this->ping_interval = val;
     return *this;
 }
 

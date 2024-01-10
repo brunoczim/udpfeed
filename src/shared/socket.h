@@ -133,7 +133,8 @@ class ReliableSocket {
                 uint64_t max_cached_sent_resps;
                 uint64_t bump_interval_nanos;
                 uint64_t max_disconnect_count;
-                uint64_t ping_count;
+                uint64_t ping_start;
+                uint64_t ping_interval;
                 int poll_timeout_ms;
 
                 Config();
@@ -142,7 +143,8 @@ class ReliableSocket {
                 Config& with_max_cached_sent_resps(uint64_t val);
                 Config& with_bump_interval_nanos(uint64_t val);
                 Config& with_max_disconnect_count(uint64_t val);
-                Config& with_ping_count(uint64_t ping_count);
+                Config& with_ping_start(uint64_t ping_start);
+                Config& with_ping_interval(uint64_t ping_interval);
                 Config& with_poll_timeout_ms(int val);
         };
 
