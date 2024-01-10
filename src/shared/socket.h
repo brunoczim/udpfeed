@@ -145,6 +145,7 @@ class ReliableSocket {
         class Connection {
             public:
                 Address remote_address;
+                uint64_t disconnect_counter;
                 bool disconnecting;
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
@@ -167,6 +168,8 @@ class ReliableSocket {
                 Socket udp;
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
+                uint64_t max_disconnect_count;
+                uint64_t ping_count;
 
                 Channel<Enveloped>::Receiver handler_to_req_receiver;
 
@@ -178,6 +181,8 @@ class ReliableSocket {
                     Socket&& udp,
                     uint64_t max_req_attempts,
                     uint64_t max_cached_sent_resps,
+                    uint64_t max_disconnect_count,
+                    uint64_t ping_count,
                     Channel<Enveloped>::Receiver&& handler_to_req_receiver
                 );
 
@@ -197,6 +202,8 @@ class ReliableSocket {
 
                 void unsafe_send_resp(Enveloped enveloped);
 
+                Enveloped unsafe_forceful_disconnect(Address remote);
+
                 std::optional<Enveloped> receive_raw(int poll_timeout_ms);
 
                 Enveloped receive();
@@ -207,7 +214,7 @@ class ReliableSocket {
 
                 void unsafe_handle_resp(Enveloped enveloped);
 
-                void bump();
+                std::vector<Enveloped> bump();
 
                 void disconnect();
         };
@@ -218,6 +225,8 @@ class ReliableSocket {
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
                 uint64_t bump_interval_nanos;
+                uint64_t max_disconnect_count;
+                uint64_t ping_count;
                 int poll_timeout_ms;
 
                 Config();
@@ -225,6 +234,8 @@ class ReliableSocket {
                 Config& with_max_req_attempts(uint64_t val);
                 Config& with_max_cached_sent_resps(uint64_t val);
                 Config& with_bump_interval_nanos(uint64_t val);
+                Config& with_max_disconnect_count(uint64_t val);
+                Config& with_ping_count(uint64_t ping_count);
                 Config& with_poll_timeout_ms(int val);
         };
 

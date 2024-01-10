@@ -270,7 +270,8 @@ ReliableSocket::Connection::Connection(
     max_req_attempts(max_req_attempts),
     max_cached_sent_resps(max_cached_sent_resps),
     remote_address(connect_request.remote),
-    disconnecting(false)
+    disconnecting(false),
+    disconnect_counter(0)
 {
 }
 
@@ -278,12 +279,16 @@ ReliableSocket::Inner::Inner(
     Socket&& udp,
     uint64_t max_req_attempts,
     uint64_t max_cached_sent_resps,
+    uint64_t max_disconnect_count,
+    uint64_t ping_count,
     Channel<Enveloped>::Receiver&& handler_to_req_receiver
 ) :
     udp(std::move(udp)),
     max_req_attempts(max_req_attempts),
     max_cached_sent_resps(max_cached_sent_resps),
-    handler_to_req_receiver(handler_to_req_receiver)
+    handler_to_req_receiver(handler_to_req_receiver),
+    max_disconnect_count(max_disconnect_count),
+    ping_count(ping_count)
 {
 }
 
@@ -409,6 +414,18 @@ void ReliableSocket::Inner::unsafe_send_resp(Enveloped enveloped)
     this->udp.send(enveloped);
 }
 
+Enveloped ReliableSocket::Inner::unsafe_forceful_disconnect(Address remote)
+{
+    this->connections.erase(remote);
+    Enveloped fake_req;
+    fake_req.remote = remote;
+    fake_req.message.body = std::shared_ptr<MessageBody>(
+        new MessageDisconnectReq
+    );
+    fake_req.message.header.fill_req();
+    return fake_req;
+}
+
 std::optional<Enveloped> ReliableSocket::Inner::receive_raw(int poll_timeout_ms)
 {
     while (this->is_connected()) {
@@ -431,6 +448,14 @@ std::optional<Enveloped> ReliableSocket::Inner::handle(Enveloped enveloped)
 {
     std::unique_lock lock(this->net_control_mutex);
 
+    if (
+        auto search = this->connections.find(enveloped.remote);
+        search != this->connections.end()
+    ) {
+        Connection& connection = std::get<1>(*search);
+        connection.disconnect_counter = 0;
+    }
+
     switch (enveloped.message.body->tag().step) {
         case MSG_REQ:
             return this->unsafe_handle_req(enveloped);
@@ -447,6 +472,20 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
     Enveloped enveloped
 )
 {
+    if (enveloped.message.body->tag().type == MSG_PING) {
+        Enveloped response;
+        response.remote = enveloped.remote;
+        response.message.header.fill_resp(
+            enveloped.message.header.seqn
+        );
+        response.message.body = std::shared_ptr<MessageBody>(
+            new MessagePingResp
+        );
+        this->udp.send(response);
+        return std::optional<Enveloped>();
+    }
+
+
     if (this->connections.find(enveloped.remote) == this->connections.end()) {
         switch (enveloped.message.body->tag().type) {
             case MSG_CONNECT:
@@ -527,9 +566,11 @@ void ReliableSocket::Inner::unsafe_handle_resp(Enveloped enveloped)
     }
 }
 
-void ReliableSocket::Inner::bump()
+std::vector<Enveloped> ReliableSocket::Inner::bump()
 {
     std::unique_lock lock(this->net_control_mutex);
+
+    std::vector<Enveloped> fake_disconnect_reqs;
 
     std::set<uint64_t> seqn_to_be_removed;
     std::set<Address> addresses_to_be_removed;
@@ -567,11 +608,29 @@ void ReliableSocket::Inner::bump()
             connection.pending_responses.erase(seqn);
         }
         seqn_to_be_removed.clear();
+
+        connection.disconnect_counter++;
+
+        if (connection.disconnect_counter > this->max_disconnect_count) {
+            addresses_to_be_removed.insert(address);
+        } else if (connection.disconnect_counter >= this->ping_count) {
+            Enveloped ping_request;
+            ping_request.remote = address;
+            ping_request.message.body = std::shared_ptr<MessageBody>(
+                new MessagePingReq
+            );
+            ping_request.message.header.fill_req();
+            this->udp.send(ping_request);
+        }
     }
 
-    for (Address const& address : addresses_to_be_removed) {
-        this->connections.erase(address);
+    for (Address address : addresses_to_be_removed) {
+        fake_disconnect_reqs.push_back(
+            this->unsafe_forceful_disconnect(address)
+        );
     }
+
+    return fake_disconnect_reqs;
 }
 
 void ReliableSocket::Inner::disconnect()
@@ -598,7 +657,9 @@ void ReliableSocket::Inner::disconnect()
 ReliableSocket::Config::Config() :
     max_req_attempts(32),
     max_cached_sent_resps(100),
-    bump_interval_nanos(10 * 1000),
+    bump_interval_nanos(250 * 1000),
+    max_disconnect_count(5000),
+    ping_count(1000),
     poll_timeout_ms(10)
 {
 }
@@ -624,6 +685,22 @@ ReliableSocket::Config& ReliableSocket::Config::with_bump_interval_nanos(
 )
 {
     this->bump_interval_nanos = val;
+    return *this;
+}
+
+ReliableSocket::Config& ReliableSocket::Config::with_max_disconnect_count(
+    uint64_t val
+)
+{
+    this->max_disconnect_count = val;
+    return *this;
+}
+
+ReliableSocket::Config& ReliableSocket::Config::with_ping_count(
+    uint64_t val
+)
+{
+    this->ping_count = val;
     return *this;
 }
 
@@ -755,7 +832,7 @@ ReliableSocket::ReliableSocket(
     handler_thread([
         inner,
         from_input = std::move(input_to_handler_channel.receiver),
-        to_req_receiver = std::move(handler_to_req_receiver)
+        to_req_receiver = handler_to_req_receiver
     ] () mutable {
         try {
             for (;;) {
@@ -768,11 +845,20 @@ ReliableSocket::ReliableSocket(
         }
     }),
 
-    bumper_thread([inner, bump_interval_nanos] () mutable {
-        std::chrono::nanoseconds interval(bump_interval_nanos);
-        while (inner->is_connected()) {
-            std::this_thread::sleep_for(interval);
-            inner->bump();
+    bumper_thread([
+        inner,
+        bump_interval_nanos,
+        channel = std::move(handler_to_req_receiver)
+    ] () mutable {
+        try {
+            std::chrono::nanoseconds interval(bump_interval_nanos);
+            while (inner->is_connected()) {
+                std::this_thread::sleep_for(interval);
+                for (auto enveloped : inner->bump()) {
+                    channel.send(enveloped);
+                }
+            }
+        } catch (ChannelDisconnected const& exc) {
         }
     })
 {
@@ -789,6 +875,8 @@ ReliableSocket::ReliableSocket(
             std::move(udp),
             config.max_req_attempts,
             config.max_cached_sent_resps,
+            config.max_disconnect_count,
+            config.ping_count,
             std::move(handler_to_recv_req_channel.receiver)
         )),
         config.bump_interval_nanos,
@@ -814,6 +902,7 @@ ReliableSocket::ReliableSocket(
 
 ReliableSocket::ReliableSocket(ReliableSocket&& other) :
     inner(std::move(other.inner)),
+
     input_thread(std::move(other.input_thread)),
     handler_thread(std::move(other.handler_thread)),
     bumper_thread(std::move(other.bumper_thread))
