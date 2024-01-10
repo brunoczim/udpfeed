@@ -36,6 +36,10 @@ int main(int argc, char const *argv[])
     Socket udp(arguments.bind_address, 1024);
     std::shared_ptr<ReliableSocket> socket(new ReliableSocket(std::move(udp)));
 
+    Logger::with([&socket] (auto& output) {
+        socket->config().report(output);
+    });
+
     std::shared_ptr<ServerProfileTable> profile_table(new ServerProfileTable);
 
     profile_table->load();

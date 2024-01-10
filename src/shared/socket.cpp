@@ -1,5 +1,6 @@
 #include "socket.h"
 #include "log.h"
+#include "time.h"
 #include <cerrno>
 #include <cstring>
 #include <unistd.h>
@@ -278,6 +279,11 @@ ReliableSocket::Inner::Inner(
     config(config),
     handler_to_req_receiver(std::move(handler_to_req_receiver))
 {
+}
+
+ReliableSocket::Config const& ReliableSocket::Inner::used_config() const
+{
+    return this->config;
 }
 
 bool ReliableSocket::Inner::is_connected()
@@ -725,6 +731,44 @@ ReliableSocket::Config& ReliableSocket::Config::with_poll_timeout_ms(int val)
     return *this;
 }
 
+uint64_t ReliableSocket::Config::min_response_timeout_ns() const
+{
+    uint64_t nanos = 0;
+
+    for (uint64_t i = 0; i <= this->max_req_attempts; i++) {
+        nanos += 1 << (i * this->req_cooldown_numer / this->req_cooldown_denom);
+    }
+
+    return nanos * this->bump_interval_nanos;
+}
+
+uint64_t ReliableSocket::Config::min_ping_timeout_ns() const
+{
+    return this->bump_interval_nanos * this->max_disconnect_count;
+}
+
+void ReliableSocket::Config::report(std::ostream& stream) const
+{
+    ReportTime min_response_timeout_ns(
+        this->min_response_timeout_ns(),
+        ReportTime::NS
+    );
+    ReportTime min_ping_timeout_ns(
+        this->min_ping_timeout_ns(),
+        ReportTime::NS
+    );
+    stream
+        << "Using configuration with:"
+        << std::endl
+        << "- minimum timeout for responses: "
+        << min_response_timeout_ns.to_string()
+        << std::endl
+        << "- minimum timeout before disconnecting: "
+        << min_ping_timeout_ns.to_string()
+        << std::endl
+    ;
+}
+
 ReliableSocket::SentReq::SentReq(
     Enveloped req_enveloped,
     Channel<Enveloped>::Receiver&& channel
@@ -956,6 +1000,11 @@ void ReliableSocket::close()
         this->handler_thread.join();
         this->bumper_thread.join();
     }
+}
+
+ReliableSocket::Config const& ReliableSocket::config() const
+{
+    return this->inner->used_config();
 }
 
 ReliableSocket::SentReq ReliableSocket::send_req(Enveloped enveloped)

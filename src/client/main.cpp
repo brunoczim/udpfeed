@@ -42,6 +42,10 @@ int main(int argc, char const *argv[])
     Socket udp(1024);
     std::shared_ptr<ReliableSocket> socket(new ReliableSocket(std::move(udp)));
 
+    Logger::with([&socket] (auto& output) {
+        socket->config().report(output);
+    });
+
     Channel<std::shared_ptr<ClientInputCommand>> interface_to_session_man;
     Channel<std::shared_ptr<ClientOutputNotice>> session_man_to_interface; 
 

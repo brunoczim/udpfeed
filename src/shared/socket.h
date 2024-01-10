@@ -150,6 +150,11 @@ class ReliableSocket {
                 Config& with_ping_start(uint64_t ping_start);
                 Config& with_ping_interval(uint64_t ping_interval);
                 Config& with_poll_timeout_ms(int val);
+
+                uint64_t min_response_timeout_ns() const;
+                uint64_t min_ping_timeout_ns() const;
+
+                void report(std::ostream& stream) const;
         };
 
     private:
@@ -199,6 +204,8 @@ class ReliableSocket {
                     Config const& config,
                     Channel<Enveloped>::Receiver&& handler_to_req_receiver
                 );
+
+                Config const& used_config() const;
 
                 bool is_connected();
 
@@ -311,6 +318,8 @@ class ReliableSocket {
             Socket&& udp,
             Config const& config = Config()
         );
+
+        Config const& config() const;
 
         ReliableSocket(ReliableSocket&& other);
         ReliableSocket& operator=(ReliableSocket&& other);
