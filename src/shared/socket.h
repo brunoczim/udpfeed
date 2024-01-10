@@ -129,6 +129,8 @@ class ReliableSocket {
     public:
         class Config {
             public:
+                uint64_t req_cooldown_numer;
+                uint64_t req_cooldown_denom;
                 uint64_t max_req_attempts;
                 uint64_t max_cached_sent_resps;
                 uint64_t bump_interval_nanos;
@@ -139,6 +141,8 @@ class ReliableSocket {
 
                 Config();
 
+                Config& with_req_cooldown_numer(uint64_t val);
+                Config& with_req_cooldown_denom(uint64_t val);
                 Config& with_max_req_attempts(uint64_t val);
                 Config& with_max_cached_sent_resps(uint64_t val);
                 Config& with_bump_interval_nanos(uint64_t val);

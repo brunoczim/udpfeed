@@ -577,7 +577,9 @@ std::vector<Enveloped> ReliableSocket::Inner::bump()
                 }
 
                 pending.cooldown_attempt++;
-                uint64_t exponent = pending.cooldown_attempt * 11 / 16;
+                uint64_t exponent = pending.cooldown_attempt;
+                exponent *= this->config.req_cooldown_numer;
+                exponent /= this->config.req_cooldown_denom;
                 pending.cooldown_counter = 1 << exponent;
             } else {
                 pending.cooldown_counter--;
@@ -641,6 +643,8 @@ void ReliableSocket::Inner::disconnect()
 }
 
 ReliableSocket::Config::Config() :
+    req_cooldown_numer(11),
+    req_cooldown_denom(16),
     max_req_attempts(23),
     max_cached_sent_resps(100),
     bump_interval_nanos(250 * 1000),
@@ -649,6 +653,22 @@ ReliableSocket::Config::Config() :
     ping_interval(500),
     poll_timeout_ms(10)
 {
+}
+
+ReliableSocket::Config& ReliableSocket::Config::with_req_cooldown_numer(
+    uint64_t val
+)
+{
+    this->req_cooldown_numer = val;
+    return *this;
+}
+
+ReliableSocket::Config& ReliableSocket::Config::with_req_cooldown_denom(
+    uint64_t val
+)
+{
+    this->req_cooldown_denom = val;
+    return *this;
 }
 
 ReliableSocket::Config& ReliableSocket::Config::with_max_req_attempts(
