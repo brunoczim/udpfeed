@@ -655,7 +655,7 @@ void ReliableSocket::Inner::disconnect()
 }
 
 ReliableSocket::Config::Config() :
-    max_req_attempts(32),
+    max_req_attempts(23),
     max_cached_sent_resps(100),
     bump_interval_nanos(250 * 1000),
     max_disconnect_count(5000),
@@ -852,10 +852,23 @@ ReliableSocket::ReliableSocket(
     ] () mutable {
         try {
             std::chrono::nanoseconds interval(bump_interval_nanos);
+            std::chrono::nanoseconds actual_interval = interval;
             while (inner->is_connected()) {
-                std::this_thread::sleep_for(interval);
+                std::this_thread::sleep_for(actual_interval);
+                std::chrono::time_point<std::chrono::system_clock> then =
+                    std::chrono::system_clock::now();
                 for (auto enveloped : inner->bump()) {
                     channel.send(enveloped);
+                }
+                std::chrono::time_point<std::chrono::system_clock> now =
+                    std::chrono::system_clock::now();
+
+                auto diff = now - then;
+
+                if (interval > diff) {
+                    actual_interval = interval - diff;
+                } else {
+                    actual_interval = std::chrono::nanoseconds(0);
                 }
             }
         } catch (ChannelDisconnected const& exc) {
