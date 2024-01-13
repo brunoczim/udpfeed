@@ -40,11 +40,11 @@ void start_server_profile_manager(
 
                 try {
                     switch (req_enveloped.message.body->tag().type) {
-                        case MSG_CONNECT: {
-                            MessageConnectReq const& message = req_enveloped
+                        case MSG_CLIENT_CONN: {
+                            MessageClientConnReq const& message = req_enveloped
                                 .message
                                 .body
-                                ->cast<MessageConnectReq>();
+                                ->cast<MessageClientConnReq>();
                             profile_table->connect(
                                 req_enveloped.remote,
                                 message.username,
@@ -52,7 +52,7 @@ void start_server_profile_manager(
                             );
                             std::move(req).send_resp(
                                 std::shared_ptr<MessageBody>(
-                                    new MessageConnectResp
+                                    new MessageClientConnResp
                                 )
                             );
                             Logger::with([

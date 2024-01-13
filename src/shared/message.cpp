@@ -65,7 +65,7 @@ MessageType msg_type_from_code(uint16_t code)
 {
     switch (code) {
         case MSG_ERROR: return MSG_ERROR;
-        case MSG_CONNECT: return MSG_CONNECT;
+        case MSG_CLIENT_CONN: return MSG_CLIENT_CONN;
         case MSG_DISCONNECT: return MSG_DISCONNECT;
         case MSG_PING: return MSG_PING;
         case MSG_FOLLOW: return MSG_FOLLOW;
@@ -159,7 +159,7 @@ Deserializer& operator>>(Deserializer& deserializer, MessageError& error)
     return deserializer;
 }
 
-MessageTag::MessageTag() : MessageTag(MSG_REQ, MSG_CONNECT)
+MessageTag::MessageTag() : MessageTag(MSG_REQ, MSG_CLIENT_CONN)
 {
 }
 
@@ -300,40 +300,70 @@ void MessageErrorResp::deserialize(Deserializer& deserializer)
 }
 
 
-MessageConnectReq::MessageConnectReq()
+MessageClientConnReq::MessageClientConnReq()
 {
 }
 
-MessageConnectReq::MessageConnectReq(Username const& username) :
+MessageClientConnReq::MessageClientConnReq(Username const& username) :
     username(username)
 {
 }
 
-MessageTag MessageConnectReq::tag() const
+MessageTag MessageClientConnReq::tag() const
 {
-    return MessageTag(MSG_REQ, MSG_CONNECT);
+    return MessageTag(MSG_REQ, MSG_CLIENT_CONN);
 }
 
-void MessageConnectReq::serialize(Serializer& serializer) const
+void MessageClientConnReq::serialize(Serializer& serializer) const
 {
     serializer << this->username;
 }
 
-void MessageConnectReq::deserialize(Deserializer& deserializer)
+void MessageClientConnReq::deserialize(Deserializer& deserializer)
 {
     deserializer >> this->username;
 }
 
-MessageTag MessageConnectResp::tag() const
+MessageTag MessageClientConnResp::tag() const
 {
-    return MessageTag(MSG_RESP, MSG_CONNECT);
+    return MessageTag(MSG_RESP, MSG_CLIENT_CONN);
 }
 
-void MessageConnectResp::serialize(Serializer& serializer) const
+void MessageClientConnResp::serialize(Serializer& serializer) const
 {
 }
 
-void MessageConnectResp::deserialize(Deserializer& deserializer)
+void MessageClientConnResp::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageServerConnReq::MessageServerConnReq()
+{
+}
+
+MessageTag MessageServerConnReq::tag() const
+{
+    return MessageTag(MSG_REQ, MSG_SERVER_CONN);
+}
+
+void MessageServerConnReq::serialize(Serializer& serializer) const
+{
+}
+
+void MessageServerConnReq::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageTag MessageServerConnResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_SERVER_CONN);
+}
+
+void MessageServerConnResp::serialize(Serializer& serializer) const
+{
+}
+
+void MessageServerConnResp::deserialize(Deserializer& deserializer)
 {
 }
 
@@ -532,9 +562,9 @@ void Message::deserialize(Deserializer& deserializer)
     switch (tag.step) {
         case MSG_REQ:
             switch (tag.type) {
-                case MSG_CONNECT:
+                case MSG_CLIENT_CONN:
                     this->body =
-                        std::shared_ptr<MessageBody>(new MessageConnectReq);
+                        std::shared_ptr<MessageBody>(new MessageClientConnReq);
                     break;
                 case MSG_DISCONNECT:
                     this->body =
@@ -564,9 +594,9 @@ void Message::deserialize(Deserializer& deserializer)
                     this->body =
                         std::shared_ptr<MessageBody>(new MessageErrorResp);
                     break;
-                case MSG_CONNECT:
+                case MSG_CLIENT_CONN:
                     this->body =
-                        std::shared_ptr<MessageBody>(new MessageConnectResp);
+                        std::shared_ptr<MessageBody>(new MessageClientConnResp);
                     break;
                 case MSG_DISCONNECT:
                     this->body =

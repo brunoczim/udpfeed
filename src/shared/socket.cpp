@@ -318,7 +318,8 @@ void ReliableSocket::Inner::unsafe_send_req(
 
     if (this->connections.find(enveloped.remote) == this->connections.end()) {
         switch (enveloped.message.body->tag().type) {
-            case MSG_CONNECT:
+            case MSG_CLIENT_CONN:
+            case MSG_SERVER_CONN:
                 this->connections.insert(std::make_pair(
                     enveloped.remote,
                     Connection(enveloped)
@@ -341,12 +342,6 @@ void ReliableSocket::Inner::unsafe_send_req(
                 return;
             }
         }
-    }
-
-    if (
-        enveloped.message.body->tag().type == MSG_CONNECT
-        && this->connections.find(enveloped.remote) == this->connections.end()
-    ) { 
     }
 
     Connection& connection = this->connections[enveloped.remote];
@@ -478,7 +473,8 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
 
     if (this->connections.find(enveloped.remote) == this->connections.end()) {
         switch (enveloped.message.body->tag().type) {
-            case MSG_CONNECT:
+            case MSG_CLIENT_CONN:
+            case MSG_SERVER_CONN:
                 this->connections.insert(std::make_pair(
                     enveloped.remote,
                     Connection(enveloped)
@@ -572,8 +568,9 @@ std::vector<Enveloped> ReliableSocket::Inner::bump()
                 if (pending.remaining_attempts == 0) {
                     seqn_to_be_removed.insert(seqn);
                     switch (pending.request.message.body->tag().type) {
+                        case MSG_CLIENT_CONN:
+                        case MSG_SERVER_CONN:
                         case MSG_DISCONNECT:
-                        case MSG_CONNECT:
                             addresses_to_be_removed.insert(address);
                             break;
                     }
