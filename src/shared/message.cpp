@@ -337,6 +337,36 @@ void MessageClientConnResp::deserialize(Deserializer& deserializer)
 {
 }
 
+MessageServerConnReq::MessageServerConnReq()
+{
+}
+
+MessageTag MessageServerConnReq::tag() const
+{
+    return MessageTag(MSG_REQ, MSG_SERVER_CONN);
+}
+
+void MessageServerConnReq::serialize(Serializer& serializer) const
+{
+}
+
+void MessageServerConnReq::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageTag MessageServerConnResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_SERVER_CONN);
+}
+
+void MessageServerConnResp::serialize(Serializer& serializer) const
+{
+}
+
+void MessageServerConnResp::deserialize(Deserializer& deserializer)
+{
+}
+
 MessageTag MessageDisconnectReq::tag() const
 {
     return MessageTag(MSG_REQ, MSG_DISCONNECT);

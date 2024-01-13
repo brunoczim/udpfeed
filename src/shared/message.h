@@ -84,6 +84,7 @@ Deserializer& operator>>(Deserializer& deserializer, MessageStep &step);
 enum MessageType {
     MSG_ERROR,
     MSG_CLIENT_CONN,
+    MSG_SERVER_CONN,
     MSG_DISCONNECT,
     MSG_PING,
     MSG_FOLLOW,
@@ -191,6 +192,24 @@ class MessageClientConnReq : public MessageBody {
 };
 
 class MessageClientConnResp : public MessageBody {
+    public:
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageServerConnReq : public MessageBody {
+    public:
+        MessageServerConnReq();
+
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageServerConnResp : public MessageBody {
     public:
         virtual MessageTag tag() const;
 
