@@ -70,12 +70,12 @@ void start_client_session_manager(
             Enveloped connect_req;
             connect_req.remote = server_addr;
             connect_req.message.body = std::shared_ptr<MessageBody>(
-                new MessageConnectReq(username)
+                new MessageClientConnReq(username)
             );
             ReliableSocket::SentReq sent_connect_req =
                 socket->send_req(connect_req);
             Enveloped connect_resp = std::move(sent_connect_req).receive_resp();
-            connect_resp.message.body->cast<MessageConnectResp>();
+            connect_resp.message.body->cast<MessageClientConnResp>();
 
             Logger::with([] (auto& output) {
                 output << "Connected!" << std::endl;
@@ -172,7 +172,7 @@ void start_client_session_manager(
                 Enveloped recv_enveloped = received.req_enveloped();
                 try {
                     switch (recv_enveloped.message.body->tag().type) {
-                        case MSG_CONNECT:
+                        case MSG_CLIENT_CONN:
                         case MSG_ERROR:
                         case MSG_FOLLOW:
                         case MSG_NOTIFY:

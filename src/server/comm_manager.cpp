@@ -67,7 +67,7 @@ void start_server_communication_manager(
                         });
                         break;
 
-                    case MSG_CONNECT:
+                    case MSG_CLIENT_CONN:
                     case MSG_DISCONNECT:
                     case MSG_FOLLOW:
                     case MSG_NOTIFY:

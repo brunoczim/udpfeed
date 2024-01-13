@@ -85,4 +85,4 @@ $(OBJ_DIR)/$(TESTER_DIR)/%.o: \
 	$(CXX) -o $@ -c $< $(CXX_FLAGS)
 
 clean:
-	rm -rf $(APP_CLIENT) $(APP_SERVER) $(OBJ_DIR)
+	rm -rf $(APP_CLIENT) $(APP_SERVER) $(APP_TESTER) $(OBJ_DIR)

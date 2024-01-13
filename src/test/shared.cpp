@@ -505,7 +505,7 @@ static TestSuite socket_test_suite()
             enveloped.message;
             enveloped.message.header.fill_req();
             enveloped.message.body = std::shared_ptr<MessageBody>(
-                new MessageConnectReq(Username("@bruno"))
+                new MessageClientConnReq(Username("@bruno"))
             );
             client.send(enveloped);
 
@@ -526,11 +526,11 @@ static TestSuite socket_test_suite()
             TEST_ASSERT(
                 "found message tag: "
                     + received.message.body->tag().to_string(),
-                received.message.body->tag() == MessageTag(MSG_REQ, MSG_CONNECT)
+                received.message.body->tag() == MessageTag(MSG_REQ, MSG_CLIENT_CONN)
             );
 
-            MessageConnectReq const& casted_body =
-                received.message.body->cast<MessageConnectReq>();
+            MessageClientConnReq const& casted_body =
+                received.message.body->cast<MessageClientConnReq>();
 
             TEST_ASSERT(
                 std::string("message username should be \"bruno\", found: ")
@@ -547,7 +547,7 @@ static TestSuite socket_test_suite()
             request.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             request.message.header.fill_req();
             request.message.body = std::shared_ptr<MessageBody>(
-                new MessageConnectReq(Username("@bruno"))
+                new MessageClientConnReq(Username("@bruno"))
             );
             client.send(request);
 
@@ -556,11 +556,11 @@ static TestSuite socket_test_suite()
             TEST_ASSERT(
                 "found " + received_req.message.body->tag().to_string(),
                 received_req.message.body->tag()
-                    == MessageTag(MSG_REQ, MSG_CONNECT)
+                    == MessageTag(MSG_REQ, MSG_CLIENT_CONN)
             );
 
-            MessageConnectReq const& casted_req_body =
-                received_req.message.body->cast<MessageConnectReq>();
+            MessageClientConnReq const& casted_req_body =
+                received_req.message.body->cast<MessageClientConnReq>();
 
             TEST_ASSERT(
                 "message username should be \"bruno\", found: "
@@ -571,8 +571,8 @@ static TestSuite socket_test_suite()
             Enveloped response;
             response.remote = received_req.remote;
             response.message.header.fill_resp(received_req.message.header.seqn);
-            response.message.body = std::shared_ptr<MessageConnectResp>(
-                new MessageConnectResp
+            response.message.body = std::shared_ptr<MessageClientConnResp>(
+                new MessageClientConnResp
             );
             server.send(response);
 
@@ -581,11 +581,11 @@ static TestSuite socket_test_suite()
             TEST_ASSERT(
                 "found " + received_resp.message.body->tag().to_string(),
                 received_resp.message.body->tag()
-                    == MessageTag(MSG_RESP, MSG_CONNECT)
+                    == MessageTag(MSG_RESP, MSG_CLIENT_CONN)
             );
 
-            MessageConnectResp const& casted_resp_body =
-                received_resp.message.body->cast<MessageConnectResp>();
+            MessageClientConnResp const& casted_resp_body =
+                received_resp.message.body->cast<MessageClientConnResp>();
         })
 ;
 }
@@ -784,7 +784,7 @@ static TestSuite reliable_socket_test_suite()
             Enveloped conn_req;
             conn_req.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             conn_req.message.body = std::shared_ptr<MessageBody>(
-                new MessageConnectReq(Username("@bruno"))
+                new MessageClientConnReq(Username("@bruno"))
             );
             ReliableSocket::SentReq sent_conn_req = client.send_req(conn_req);
 
@@ -793,18 +793,18 @@ static TestSuite reliable_socket_test_suite()
                 "found " + recvd_conn_req.req_enveloped()
                     .message.body->tag().to_string(),
                 recvd_conn_req.req_enveloped().message.body->tag()
-                    == MessageTag(MSG_REQ, MSG_CONNECT)
+                    == MessageTag(MSG_REQ, MSG_CLIENT_CONN)
             );
 
             std::move(recvd_conn_req).send_resp(std::shared_ptr<MessageBody>(
-                new MessageConnectResp
+                new MessageClientConnResp
             ));
 
             Enveloped recvd_conn_resp = std::move(sent_conn_req).receive_resp();
             TEST_ASSERT(
                 "found " + recvd_conn_resp.message.body->tag().to_string(),
                 recvd_conn_resp.message.body->tag()
-                    == MessageTag(MSG_RESP, MSG_CONNECT)
+                    == MessageTag(MSG_RESP, MSG_CLIENT_CONN)
             );
 
             Enveloped disconn_req;
@@ -851,11 +851,11 @@ static TestSuite reliable_socket_test_suite()
                     "found " + recvd_conn_req.req_enveloped()
                         .message.body->tag().to_string(),
                     recvd_conn_req.req_enveloped().message.body->tag()
-                        == MessageTag(MSG_REQ, MSG_CONNECT)
+                        == MessageTag(MSG_REQ, MSG_CLIENT_CONN)
                 );
 
                 std::move(recvd_conn_req).send_resp(
-                    std::shared_ptr<MessageBody>(new MessageConnectResp)
+                    std::shared_ptr<MessageBody>(new MessageClientConnResp)
                 );
 
                 ReliableSocket::ReceivedReq recvd_disconn_req =
@@ -875,7 +875,7 @@ static TestSuite reliable_socket_test_suite()
             Enveloped conn_req;
             conn_req.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             conn_req.message.body = std::shared_ptr<MessageBody>(
-                new MessageConnectReq(Username("@bruno"))
+                new MessageClientConnReq(Username("@bruno"))
             );
             ReliableSocket::SentReq sent_conn_req = client.send_req(conn_req);
 
@@ -883,7 +883,7 @@ static TestSuite reliable_socket_test_suite()
             TEST_ASSERT(
                 "found " + recvd_conn_resp.message.body->tag().to_string(),
                 recvd_conn_resp.message.body->tag()
-                    == MessageTag(MSG_RESP, MSG_CONNECT)
+                    == MessageTag(MSG_RESP, MSG_CLIENT_CONN)
             );
 
             Enveloped disconn_req;
@@ -921,7 +921,7 @@ static TestSuite reliable_socket_test_suite()
                     conn_req.remote =
                         Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
                     conn_req.message.body = std::shared_ptr<MessageBody>(
-                        new MessageConnectReq(Username("@bruno"))
+                        new MessageClientConnReq(Username("@bruno"))
                     );
                     ReliableSocket::SentReq sent_conn_req =
                         client.send_req(conn_req);
@@ -932,7 +932,7 @@ static TestSuite reliable_socket_test_suite()
                         "found "
                             + recvd_conn_resp.message.body->tag().to_string(),
                         recvd_conn_resp.message.body->tag()
-                            == MessageTag(MSG_RESP, MSG_CONNECT)
+                            == MessageTag(MSG_RESP, MSG_CLIENT_CONN)
                     );
 
                     Enveloped disconn_req;
@@ -962,10 +962,10 @@ static TestSuite reliable_socket_test_suite()
             while (disconnected < thread_count) {
                 ReliableSocket::ReceivedReq received = server.receive_req();
                 switch (received.req_enveloped().message.body->tag().type) {
-                    case MSG_CONNECT:
+                    case MSG_CLIENT_CONN:
                         std::move(received)
                             .send_resp(std::shared_ptr<MessageBody>(
-                                new MessageConnectResp
+                                new MessageClientConnResp
                             ));
                         connected++;
                         break;
