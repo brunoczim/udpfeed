@@ -189,6 +189,16 @@ bool Address::operator>=(Address const& other) const
     return this->ipv4 >= other.ipv4 && this->port >= other.port;
 }
 
+void Address::serialize(Serializer& stream) const
+{
+    stream << this->ipv4 << this->port;
+}
+
+void Address::deserialize(Deserializer& stream)
+{
+    stream >> this->ipv4 >> this->port;
+}
+
 std::string Address::to_string() const
 {
     return ipv4_to_string(this->ipv4) + ":" + std::to_string(this->port);

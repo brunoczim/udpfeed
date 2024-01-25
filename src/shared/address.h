@@ -6,6 +6,8 @@
 #include <array>
 #include <cstdint>
 
+#include "serialization.h"
+
 #define UDP_PORT_MIN 1
 #define UDP_PORT_MAX UINT16_MAX
 
@@ -39,7 +41,7 @@ uint32_t make_ipv4(std::array<uint8_t, 4> bytes);
 
 std::string ipv4_to_string(uint32_t ipv4);
 
-class Address {
+class Address : public Serializable, public Deserializable {
     public:
         uint32_t ipv4;
         uint16_t port;
@@ -55,6 +57,9 @@ class Address {
         bool operator<=(Address const& other) const;
         bool operator>(Address const& other) const;
         bool operator>=(Address const& other) const;
+
+        virtual void serialize(Serializer& stream) const;
+        virtual void deserialize(Deserializer& stream);
 
         std::string to_string() const;
 };
