@@ -11,22 +11,23 @@
 #define UDP_PORT_MIN 1
 #define UDP_PORT_MAX UINT16_MAX
 
-class InvalidUdpPort : public std::exception {
+class InvalidAddress : public std::exception {
     private:
         std::string message;
     public:
-        InvalidUdpPort(char const *port, std::string const& message);
+        InvalidUdpPort(std::string const& message);
 
         virtual const char *what() const noexcept;
 };
 
-class InvalidIpv4 : public std::exception {
-    private:
-        std::string message;
+class InvalidUdpPort : public InvalidAddress {
+    public:
+        InvalidUdpPort(char const *port, std::string const& message);
+};
+
+class InvalidIpv4 : public InvalidAddress {
     public:
         InvalidIpv4(char const *ipv4, std::string const& message);
-
-        virtual const char *what() const noexcept;
 };
 
 uint16_t parse_udp_port(char const *content);
@@ -62,6 +63,9 @@ class Address : public Serializable, public Deserializable {
         virtual void deserialize(Deserializer& stream);
 
         std::string to_string() const;
+
+        static Address parse(char const *content);
+        static Address parse(std::string const& content);
 };
 
 #endif

@@ -4,7 +4,6 @@
 #include "../shared/message.h"
 #include "../shared/tracker.h"
 #include "../shared/address.h"
-#include "../shared/socket.h"
 
 void start_server_replication_manager(
     ThreadTracker& thread_tracker,

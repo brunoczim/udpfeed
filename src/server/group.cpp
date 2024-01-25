@@ -83,8 +83,67 @@ void ServerGroup::deserialize(Deserializer& stream)
     stream >> this->servers >> this->coordinator;
 }
 
-std::vector<Address> ServerGroup::load_server_addr_list(char const *path)
+void ServerGroup::connect(ReliableSocket& socket, char const *path)
 {
+    this->servers.clear();
+    this->coordinator = std::nullopt;
+
+    std::set<Address> list = ServerGroup::load_server_addr_list(path);
+
+    bool connected = false;
+    bool attempted = false;
+
+    for (auto server_addr : list) {
+        attempted = true;
+        connected = this->try_connect(socket, server_addr);
+        if (connected) {
+            break;
+        }
+    }
+
+    if (!connected) {
+        if (attempted) {
+            throw ServerListFailure("could not connect to any given server");
+        }
+        this->elected(this->self);
+    }
+}
+
+bool ServerGroup::try_connect(ReliableSocket& socket, Address server_addr)
+{
+    Enveloped req_enveloped;
+    req_enveloped.remote = server_addr;
+    req_enveloped.message.body =
+        std::shared_ptr<MessageBody>(new MessageServerConnReq);
+    ReliableSocket::SentReq request = socket.send_req(req_enveloped);
+    Enveloped resp_enveloped = request.receive_resp();
+    try {
+        resp_enveloped.body->cast<MessageServerConnResp>();
+        return true;
+    } catch (MissedResponse const& exc) {
+        return false;
+    }
+}
+
+char const *ServerGroup::server_addr_list_path(char const *default_path)
+{
+    char const *path = default_path;
+    if (path == NULL) {
+        path = getenv(ServerGroup::path_env_var);
+        if (path[0] == 0) {
+            path = NULL;
+        }
+    }
+    if (path == NULL) {
+        path = ServerGroup::default_path;
+    }
+    return path;
+}
+
+std::set<Address> ServerGroup::load_server_addr_list(char const *default_path)
+{
+    char const *path = ServerGroup::server_addr_list_path(default_path);
+
     std::ifstream file;
     file.open(path);
     if (file.fail()) {
@@ -92,34 +151,19 @@ std::vector<Address> ServerGroup::load_server_addr_list(char const *path)
     }
 
     std::string buf;
-    std::vector<Address> addresses;
+    std::set<Address> addresses;
 
     while (std::getline(file, buf)) {
         buf = trim_spaces(buf);
         if (!buf.empty()) {
-            size_t pos = buf.find(':');
-            if (pos == std::string::npos) {
-                pos = buf.find(' ');
-            }
-            if (pos == std::string::npos) {
-                throw ServerListFailure(path);
-            }
-            std::string ipv4_str = buf.substr(0, pos);
-            std::string port_str = buf.substr(pos + 1, buf.size());
-            uint32_t ipv4 = parse_ipv4(ipv4_str);
-            uint16_t port = parse_udp_port(port_str);
-            addresses.push_back(Address(ipv4, port));
+            addresses.insert(Address::parse(buf));
         }
     }
 
-    return addresses;
-}
+    char const *direct_addr = getenv(ServerGroup::direct_env_var);
+    if (direct_addr != NULL && direct_addr[0] == 0) {
+        addresses.insert(Address::parse(direct_addr));
+    }
 
-std::vector<Address> ServerGroup::load_server_addr_list()
-{
-    char const *var = getenv(ServerGroup::path_env_var);
-    if (var == NULL) {
-        return ServerGroup::load_server_addr_list(ServerGroup::default_path);
-    } 
-    return ServerGroup::load_server_addr_list(var);
+    return addresses;
 }

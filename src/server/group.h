@@ -5,9 +5,9 @@
 #include <optional>
 #include <exception>
 #include <string>
-#include <vector>
 #include "../shared/address.h"
 #include "../shared/serialization.h"
+#include "../shared/socket.h"
 
 class UnknownServerAddr {
     private:
@@ -36,7 +36,9 @@ class ServerGroup : public Serializable, public Deserializable {
         std::optional<Address> coordinator;
 
     public:
-        static constexpr char const *path_env_var = "SISOP2_SERVER_FILE";
+        static constexpr char const *path_env_var = "SISOP2_SERVER_GROUP_FILE";
+
+        static constexpr char const *direct_env_var = "SISOP2_SERVER_GROUP";
 
         static constexpr char const *default_path = ".sisop2_server_addrs";
 
@@ -50,8 +52,20 @@ class ServerGroup : public Serializable, public Deserializable {
         virtual void serialize(Serializer& stream) const;
         virtual void deserialize(Deserializer& stream);
 
-        static std::vector<Address> load_server_addr_list(char const *path);
-        static std::vector<Address> load_server_addr_list();
+        void connect(ReliableSocket& socket, char const *path = NULL);
+
+    private:
+        bool try_connect(ReliableSocket& socket, Address server_addr);
+
+    public:
+
+        static char const *server_addr_list_path(
+            char const *default_path = NULL
+        );
+
+        static std::set<Address> load_server_addr_list(
+            char const *default_path = NULL
+        );
 };
 
 #endif
