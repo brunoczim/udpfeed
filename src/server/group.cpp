@@ -168,24 +168,43 @@ std::set<Address> ServerGroup::load_server_addr_list(char const *default_path)
 {
     char const *path = ServerGroup::server_addr_list_path(default_path);
 
-    std::ifstream file;
-    file.open(path);
-    if (file.fail()) {
-        return std::set<Address>();
-    }
-
-    std::string buf;
     std::set<Address> addresses;
 
-    while (std::getline(file, buf)) {
-        buf = trim_spaces(buf);
-        if (!buf.empty()) {
-            addresses.insert(Address::parse(buf));
+    Logger::with([path] (auto& output) {
+        output
+            << "Looking for server group addresses in file "
+            << path
+            << std::endl;
+    });
+
+    std::ifstream file;
+    file.open(path);
+    if (file.good()) {
+        std::string buf;
+        while (std::getline(file, buf)) {
+            buf = trim_spaces(buf);
+            if (!buf.empty()) {
+                addresses.insert(Address::parse(buf));
+            }
         }
+    } else {
+        Logger::with([path] (auto& output) {
+            output
+                << "Failed to open file "
+                << path << "... Skipping it"
+                << std::endl;
+        });
     }
 
+
     char const *direct_addr = getenv(ServerGroup::direct_env_var);
-    if (direct_addr != NULL && direct_addr[0] == 0) {
+    if (direct_addr != NULL && direct_addr[0] != 0) {
+        Logger::with([] (auto& output) {
+            output
+                << ""
+                << path
+                << std::endl;
+        });
         addresses.insert(Address::parse(direct_addr));
     }
 
