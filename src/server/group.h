@@ -57,6 +57,11 @@ class ServerGroup : public Serializable, public Deserializable {
     private:
         bool try_connect(ReliableSocket& socket, Address server_addr);
 
+        void load_data(
+            std::set<Address> const& servers,
+            std::optional<Address> coordinator
+        );
+
     public:
 
         static char const *server_addr_list_path(

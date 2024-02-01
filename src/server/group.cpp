@@ -72,7 +72,6 @@ std::set<Address> const &ServerGroup::server_addrs() const
     return this->servers;
 }
 
-
 void ServerGroup::serialize(Serializer& stream) const
 {
     stream << this->servers << this->coordinator;
@@ -116,13 +115,38 @@ bool ServerGroup::try_connect(ReliableSocket& socket, Address server_addr)
     req_enveloped.message.body =
         std::shared_ptr<MessageBody>(new MessageServerConnReq);
     ReliableSocket::SentReq request = socket.send_req(req_enveloped);
-    Enveloped resp_enveloped = request.receive_resp();
+    Enveloped resp_enveloped = std::move(request).receive_resp();
     try {
-        resp_enveloped.body->cast<MessageServerConnResp>();
+        MessageServerConnResp resp_data =
+            resp_enveloped.message.body->cast<MessageServerConnResp>();
+        this->load_data(resp_data.members, resp_data.coordinator);
         return true;
     } catch (MissedResponse const& exc) {
         return false;
     }
+}
+
+void ServerGroup::load_data(
+    std::set<Address> const& servers,
+    std::optional<Address> coordinator
+)
+{
+    if (coordinator && servers.find(*coordinator) == servers.end()) {
+        throw ServerListFailure(
+            "coordinator " + coordinator->to_string() + " is not in server list"
+        );
+    }
+
+    if (servers.find(this->self) == servers.end()) {
+        throw ServerListFailure(
+            "this server's address "
+                + this->self.to_string()
+                + " is not in server list"
+        );
+    }
+
+    this->servers = servers;
+    this->coordinator = coordinator;
 }
 
 char const *ServerGroup::server_addr_list_path(char const *default_path)
@@ -147,7 +171,7 @@ std::set<Address> ServerGroup::load_server_addr_list(char const *default_path)
     std::ifstream file;
     file.open(path);
     if (file.fail()) {
-        return std::vector<Address>();
+        return std::set<Address>();
     }
 
     std::string buf;

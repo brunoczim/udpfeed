@@ -212,6 +212,8 @@ class MessageServerConnReq : public MessageBody {
 class MessageServerConnResp : public MessageBody {
     public:
         virtual MessageTag tag() const;
+        std::set<Address> members;
+        std::optional<Address> coordinator;
 
         virtual void serialize(Serializer& serializer) const;
         virtual void deserialize(Deserializer& deserializer);

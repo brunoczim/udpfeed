@@ -3,6 +3,7 @@
 #include <sstream>
 #include <arpa/inet.h>
 #include "address.h"
+#include "string_ext.h"
 
 static void skip_whitespace(char const *string, size_t& pos);
 
@@ -18,14 +19,16 @@ const char *InvalidAddress::what() const noexcept
 InvalidUdpPort::InvalidUdpPort(
     char const *port,
     std::string const &message
-): InvalidAddress("port " + port + " is invalid: " + message)
+): InvalidAddress(std::string("port ") + port + " is invalid: " + message)
 {
 }
 
 InvalidIpv4::InvalidIpv4(
     char const *address,
     std::string const &message
-): InvalidAddress("IPv4 " + address + " is invalid: " + message)
+): InvalidAddress(
+    std::string("ipv4 address ") + address + " is invalid: " + message
+)
 {
 }
 

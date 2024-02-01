@@ -15,7 +15,7 @@ class InvalidAddress : public std::exception {
     private:
         std::string message;
     public:
-        InvalidUdpPort(std::string const& message);
+        InvalidAddress(std::string const& message);
 
         virtual const char *what() const noexcept;
 };
