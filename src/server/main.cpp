@@ -6,6 +6,7 @@
 #include "comm_manager.h"
 #include "prof_manager.h"
 #include "notif_manager.h"
+#include "group.h"
 #include "../shared/shutdown.h"
 #include "../shared/log.h"
 
@@ -36,12 +37,12 @@ int main(int argc, char const *argv[])
     Socket udp(arguments.bind_address, 1024);
     std::shared_ptr<ReliableSocket> socket(new ReliableSocket(std::move(udp)));
 
-    ServerGroup server_group(arguments.bind_address);
-    server_group.connect();
-
     Logger::with([&socket] (auto& output) {
         socket->config().report(output);
     });
+
+    ServerGroup server_group(arguments.bind_address);
+    server_group.connect(*socket);
 
     std::shared_ptr<ServerProfileTable> profile_table(new ServerProfileTable);
 

@@ -1,4 +1,5 @@
 #include "group.h"
+#include "../shared/log.h"
 #include "../shared/string_ext.h"
 #include <fstream>
 
@@ -191,7 +192,8 @@ std::set<Address> ServerGroup::load_server_addr_list(char const *default_path)
         Logger::with([path] (auto& output) {
             output
                 << "Failed to open file "
-                << path << "... Skipping it"
+                << path
+                << "... Skipping it"
                 << std::endl;
         });
     }
@@ -201,8 +203,9 @@ std::set<Address> ServerGroup::load_server_addr_list(char const *default_path)
     if (direct_addr != NULL && direct_addr[0] != 0) {
         Logger::with([] (auto& output) {
             output
-                << ""
-                << path
+                << "Getting a server group alternative from environemnt "
+                << "variable "
+                << ServerGroup::direct_env_var
                 << std::endl;
         });
         addresses.insert(Address::parse(direct_addr));
