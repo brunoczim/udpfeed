@@ -6,6 +6,7 @@
 #include "comm_manager.h"
 #include "prof_manager.h"
 #include "notif_manager.h"
+#include "replication_manager.h"
 #include "group.h"
 #include "../shared/shutdown.h"
 #include "../shared/log.h"
@@ -49,13 +50,16 @@ int main(int argc, char const *argv[])
     profile_table->load();
 
     Channel<ReliableSocket::ReceivedReq> comm_to_prof_man;
-    Channel<Enveloped> notif_to_comm_man;
+    Channel<ReliableSocket::ReceivedReq> comm_to_replic_man;
+    Channel<Enveloped> group_notif_to_comm_man;
     Channel<Username> prof_to_notif_man;
 
     Channel<ReliableSocket::ReceivedReq>::Receiver prof_receiver =
         comm_to_prof_man.receiver;
+    Channel<ReliableSocket::ReceivedReq>::Receiver replic_receiver =
+        comm_to_replic_man.receiver;
     Channel<Enveloped>::Receiver comm_receiver =
-        notif_to_comm_man.receiver;
+        group_notif_to_comm_man.receiver;
     Channel<Username>::Receiver notif_receiver =
         prof_to_notif_man.receiver;
 
@@ -67,7 +71,8 @@ int main(int argc, char const *argv[])
         thread_tracker,
         socket,
         std::move(comm_to_prof_man.sender),
-        std::move(notif_to_comm_man.receiver)
+        std::move(comm_to_replic_man.sender),
+        std::move(group_notif_to_comm_man.receiver)
     );
 
     Logger::with([] (auto& output) {
@@ -88,8 +93,19 @@ int main(int argc, char const *argv[])
     start_server_notification_manager(
         thread_tracker,
         profile_table,
-        std::move(notif_to_comm_man.sender),
+        std::move(group_notif_to_comm_man.sender),
         std::move(prof_to_notif_man.receiver)
+    );
+
+    Logger::with([] (auto& output) {
+        output << "Starting replication manager" << std::endl;
+    });
+
+    start_server_replication_manager(
+        thread_tracker,
+        std::move(server_group),
+        std::move(group_notif_to_comm_man.sender),
+        std::move(comm_to_replic_man.receiver)
     );
 
     Logger::with([] (auto& output) {
@@ -105,6 +121,7 @@ int main(int argc, char const *argv[])
     prof_receiver.disconnect();
     comm_receiver.disconnect();
     notif_receiver.disconnect();
+    comm_receiver.disconnect();
 
     socket->disconnect_timeout(50 * 1000 * 1000, 10);
 
