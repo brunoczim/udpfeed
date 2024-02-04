@@ -46,6 +46,7 @@ class ServerGroup : public Serializable, public Deserializable {
         bool add_server(Address server_addr);
         bool remove_server(Address server_addr);
         void elected(Address coordinator_addr);
+        Address self_addr() const;
         std::optional<Address> coordinator_addr() const;
         std::set<Address> const &server_addrs() const;
 

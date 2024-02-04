@@ -44,7 +44,8 @@ void start_server_communication_manager(
 
     thread_tracker.spawn([
         socket,
-        to_profile_man = std::move(to_profile_man)
+        to_profile_man = std::move(to_profile_man),
+        to_replic_man = std::move(to_replic_man)
     ] () mutable {
         ReliableSocket::DisconnectGuard guard_(socket);
 
@@ -74,7 +75,11 @@ void start_server_communication_manager(
                     case MSG_NOTIFY:
                         to_profile_man.send(req);
                         break;
-                    }
+
+                    case MSG_SERVER_CONN:
+                        to_replic_man.send(req);
+                        break;
+                }
             }
         } catch (ChannelDisconnected const& exc) {
         }

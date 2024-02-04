@@ -63,6 +63,11 @@ void ServerGroup::elected(Address coordinator_addr)
     this->coordinator = coordinator_addr;
 }
 
+Address ServerGroup::self_addr() const
+{
+    return this->self;
+}
+
 std::optional<Address> ServerGroup::coordinator_addr() const
 {
     return this->coordinator;
