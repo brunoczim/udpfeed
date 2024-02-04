@@ -3,39 +3,33 @@
 #include <sstream>
 #include <arpa/inet.h>
 #include "address.h"
+#include "string_ext.h"
 
 static void skip_whitespace(char const *string, size_t& pos);
+
+InvalidAddress::InvalidAddress(std::string const& message): message(message)
+{
+}
+
+const char *InvalidAddress::what() const noexcept
+{
+    return message.c_str();
+}
 
 InvalidUdpPort::InvalidUdpPort(
     char const *port,
     std::string const &message
-): message()
+): InvalidAddress(std::string("port ") + port + " is invalid: " + message)
 {
-    this->message += "port '";
-    this->message += port;
-    this->message += "' is invalid: ";
-    this->message += message;
-}
-
-const char *InvalidUdpPort::what() const noexcept
-{
-    return message.c_str();
 }
 
 InvalidIpv4::InvalidIpv4(
     char const *address,
     std::string const &message
-): message()
+): InvalidAddress(
+    std::string("ipv4 address ") + address + " is invalid: " + message
+)
 {
-    this->message += "ipv4 address '";
-    this->message += address;
-    this->message += "' is invalid: ";
-    this->message += message;
-}
-
-const char *InvalidIpv4::what() const noexcept
-{
-    return message.c_str();
 }
 
 uint16_t parse_udp_port(char const *content)
@@ -189,9 +183,41 @@ bool Address::operator>=(Address const& other) const
     return this->ipv4 >= other.ipv4 && this->port >= other.port;
 }
 
+void Address::serialize(Serializer& stream) const
+{
+    stream << this->ipv4 << this->port;
+}
+
+void Address::deserialize(Deserializer& stream)
+{
+    stream >> this->ipv4 >> this->port;
+}
+
 std::string Address::to_string() const
 {
     return ipv4_to_string(this->ipv4) + ":" + std::to_string(this->port);
+}
+
+Address Address::parse(char const *content)
+{
+    return Address::parse(std::string(content));
+}
+
+Address Address::parse(std::string const& content)
+{
+    std::string buf = trim_spaces(buf);
+    size_t pos = buf.rfind(':');
+    if (pos == std::string::npos) {
+        pos = buf.rfind(' ');
+    }
+    if (pos == std::string::npos) {
+        throw InvalidAddress("Address " + content + " has no port division");
+    }
+    std::string ipv4_str = buf.substr(0, pos);
+    std::string port_str = buf.substr(pos + 1, buf.size());
+    uint32_t ipv4 = parse_ipv4(ipv4_str);
+    uint16_t port = parse_udp_port(port_str);
+    return Address(ipv4, port);
 }
 
 static void skip_whitespace(char const *string, size_t& pos)

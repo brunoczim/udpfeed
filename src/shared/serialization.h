@@ -8,6 +8,7 @@
 #include <deque>
 #include <set>
 #include <map>
+#include <optional>
 
 class Serializable;
 
@@ -68,6 +69,9 @@ class Serializer {
         virtual Serializer& operator<<(std::string const& data) = 0;
 
         template <typename T>
+        Serializer& operator<<(std::optional<T> const& data);
+
+        template <typename T>
         Serializer& operator<<(std::vector<T> const& data);
 
         template <typename T>
@@ -109,6 +113,9 @@ class Deserializer {
         virtual Deserializer& operator>>(std::string& data) = 0;
 
         template <typename T>
+        Deserializer& operator>>(std::optional<T>& data);
+
+        template <typename T>
         Deserializer& operator>>(std::vector<T>& data);
         
         template <typename T>
@@ -139,6 +146,17 @@ class Deserializable {
         virtual void deserialize(Deserializer& stream) = 0;
         virtual ~Deserializable();
 };
+
+template <typename T>
+Serializer& Serializer::operator<<(std::optional<T> const& data)
+{
+    if (data) {
+        *this << ((uint8_t) 1) << *data;
+    } else {
+        *this << ((uint8_t) 0) << *data;
+    }
+    return *this;
+}
 
 template <typename T>
 Serializer& Serializer::operator<<(std::vector<T> const& data)
@@ -186,6 +204,17 @@ template <typename A, typename B>
 Serializer& Serializer::operator<<(std::pair<A, B> const& data)
 {
     *this << std::get<0>(data) << std::get<1>(data);
+    return *this;
+}
+
+template <typename T>
+Deserializer& Deserializer::operator>>(std::optional<T>& data)
+{
+    uint8_t present;
+    *this >> present;
+    if (present != 0) {
+        *this >> *data;
+    }
     return *this;
 }
 
