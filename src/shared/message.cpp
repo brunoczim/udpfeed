@@ -536,6 +536,48 @@ void MessageDeliverResp::deserialize(Deserializer& deserializer)
 {
 }
 
+MessageTag MessageRmLookupReq::tag() const
+{
+    return MessageTag(MSG_REQ, MSG_RM_LOOKUP);
+}
+
+void MessageRmLookupReq::serialize(Serializer& serializer) const
+{
+}
+
+void MessageRmLookupReq::deserialize(Deserializer& deserializer)
+{
+}
+
+MessageRmLookupResp::MessageRmLookupResp() :
+    MessageRmLookupResp(std::set<Address>(), std::optional<Address>())
+{
+}
+
+MessageRmLookupResp::MessageRmLookupResp(
+    std::set<Address> const& rms,
+    std::optional<Address> primary
+) :
+    rms(rms),
+    primary(primary)
+{
+}
+
+MessageTag MessageRmLookupResp::tag() const
+{
+    return MessageTag(MSG_RESP, MSG_RM_LOOKUP);
+}
+
+void MessageRmLookupResp::serialize(Serializer& serializer) const
+{
+    serializer << this->rms << this-> primary;
+}
+
+void MessageRmLookupResp::deserialize(Deserializer& deserializer)
+{
+    deserializer >> this->rms >> this-> primary;
+}
+
 void Message::serialize(Serializer& serializer) const
 {
     serializer

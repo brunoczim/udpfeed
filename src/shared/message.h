@@ -89,7 +89,8 @@ enum MessageType {
     MSG_PING,
     MSG_FOLLOW,
     MSG_NOTIFY,
-    MSG_DELIVER
+    MSG_DELIVER,
+    MSG_RM_LOOKUP
 };
 
 class InvalidMessageType : public DeserializationError {
@@ -314,6 +315,31 @@ class MessageDeliverReq : public MessageBody {
 
 class MessageDeliverResp : public MessageBody {
     public:
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageRmLookupReq : public MessageBody {
+    public:
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
+};
+
+class MessageRmLookupResp : public MessageBody {
+    public:
+        std::set<Address> rms;
+        std::optional<Address> primary;
+
+        MessageRmLookupResp();
+        MessageRmLookupResp(
+            std::set<Address> const& rms,
+            std::optional<Address> primary
+        );
+    
         virtual MessageTag tag() const;
 
         virtual void serialize(Serializer& serializer) const;
