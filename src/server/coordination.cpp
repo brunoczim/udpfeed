@@ -1,23 +1,7 @@
-#include "group.h"
+#include "coordination.h"
 #include "../shared/log.h"
 #include "../shared/string_ext.h"
 #include <fstream>
-
-UnknownServerAddr::UnknownServerAddr(Address server_addr) :
-    server(server_addr),
-    message("Server address " + server_addr.to_string() + " is unknown")
-{
-}
-
-Address UnknownServerAddr::server_addr() const
-{
-    return this->server;
-}
-
-char const *UnknownServerAddr::what() const noexcept
-{
-    return this->message.c_str();
-}
 
 ServerListFailure::ServerListFailure(std::string const& path) :
     path_(path),
@@ -35,76 +19,62 @@ char const *ServerListFailure::what() const noexcept
     return this->message.c_str();
 }
 
-ServerGroup::ServerGroup(Address self) : self(self), coordinator(std::nullopt)
+char const *SelfServerRemoved::what() const noexcept
+{
+    return "bad server coordination state, self is not in group";
+}
+
+ServerCoordination::ServerCoordination(Address self) :
+    ServerCoordination(self, RmGroup(std::set<Address> { self }, std::nullopt))
 {
 }
 
-bool ServerGroup::add_server(Address server_addr)
+ServerCoordination::ServerCoordination(Address self, RmGroup const& group) :
+    self(self),
+    group_(group)
 {
-    return std::get<1>(this->servers.insert(server_addr));
-}
-
-bool ServerGroup::remove_server(Address server_addr)
-{
-    if (this->servers.extract(server_addr)) {
-        if (this->coordinator && server_addr == *this->coordinator) {
-            this->coordinator = std::nullopt;
-        }
-        return true;
+    if (!this->group_.contains_server(self)) {
+        throw SelfServerRemoved();
     }
-    return false;
 }
 
-void ServerGroup::elected(Address coordinator_addr)
-{
-    if (this->servers.find(coordinator_addr) == this->servers.end()) {
-        throw UnknownServerAddr(coordinator_addr);
-    }
-    this->coordinator = coordinator_addr;
-}
-
-Address ServerGroup::self_addr() const
+Address ServerCoordination::self_addr() const
 {
     return this->self;
 }
 
-std::optional<Address> ServerGroup::coordinator_addr() const
+RmGroup const& ServerCoordination::group() const
 {
-    return this->coordinator;
+    return this->group_;
 }
 
-std::set<Address> const &ServerGroup::server_addrs() const
-{
-    return this->servers;
-}
-
-ServerGroup::ElectionState ServerGroup::cur_election_state() const
+ServerCoordination::ElectionState ServerCoordination::cur_election_state() const
 {
     return this->election_state;
 }
 
-std::set<Address> ServerGroup::bullies() const
+bool ServerCoordination::add_server(Address address)
 {
-    auto iterator = this->servers.upper_bound(this->self);
-    return std::set<Address>(iterator, this->servers.cend());
+    return this->group_.add_server(address);
 }
 
-void ServerGroup::serialize(Serializer& stream) const
+bool ServerCoordination::remove_server(Address address)
 {
-    stream << this->servers << this->coordinator;
+    if (address == this->self) {
+        throw SelfServerRemoved();
+    }
+    return this->group_.remove_server(address);
 }
 
-void ServerGroup::deserialize(Deserializer& stream)
+std::set<Address> ServerCoordination::bullies() const
 {
-    stream >> this->servers >> this->coordinator;
+    auto iterator = this->group().server_addrs().upper_bound(this->self);
+    return std::set<Address>(iterator, this->group().server_addrs().cend());
 }
 
-void ServerGroup::connect(ReliableSocket& socket, char const *path)
+void ServerCoordination::connect(ReliableSocket& socket, char const *path)
 {
-    this->servers.clear();
-    this->coordinator = std::nullopt;
-
-    std::set<Address> list = ServerGroup::load_server_addr_list(path);
+    std::set<Address> list = ServerCoordination::load_server_addr_list(path);
 
     bool connected = false;
     bool attempted = false;
@@ -121,11 +91,11 @@ void ServerGroup::connect(ReliableSocket& socket, char const *path)
         if (attempted) {
             throw ServerListFailure("could not connect to any given server");
         }
-        this->elected(this->self);
+        this->group_.primary_elected(this->self);
     }
 }
 
-bool ServerGroup::try_connect(ReliableSocket& socket, Address server_addr)
+bool ServerCoordination::try_connect(ReliableSocket& socket, Address server_addr)
 {
     Enveloped req_enveloped;
     req_enveloped.remote = server_addr;
@@ -143,7 +113,7 @@ bool ServerGroup::try_connect(ReliableSocket& socket, Address server_addr)
     }
 }
 
-void ServerGroup::load_data(
+void ServerCoordination::load_data(
     std::set<Address> const& servers,
     std::optional<Address> coordinator
 )
@@ -162,28 +132,27 @@ void ServerGroup::load_data(
         );
     }
 
-    this->servers = servers;
-    this->coordinator = coordinator;
+    this->group_ = RmGroup(servers, coordinator);
 }
 
-char const *ServerGroup::server_addr_list_path(char const *default_path)
+char const *ServerCoordination::server_addr_list_path(char const *default_path)
 {
     char const *path = default_path;
     if (path == NULL) {
-        path = getenv(ServerGroup::path_env_var);
+        path = getenv(ServerCoordination::path_env_var);
         if (path[0] == 0) {
             path = NULL;
         }
     }
     if (path == NULL) {
-        path = ServerGroup::default_path;
+        path = ServerCoordination::default_path;
     }
     return path;
 }
 
-std::set<Address> ServerGroup::load_server_addr_list(char const *default_path)
+std::set<Address> ServerCoordination::load_server_addr_list(char const *default_path)
 {
-    char const *path = ServerGroup::server_addr_list_path(default_path);
+    char const *path = ServerCoordination::server_addr_list_path(default_path);
 
     std::set<Address> addresses;
 
@@ -215,13 +184,13 @@ std::set<Address> ServerGroup::load_server_addr_list(char const *default_path)
     }
 
 
-    char const *direct_addr = getenv(ServerGroup::direct_env_var);
+    char const *direct_addr = getenv(ServerCoordination::direct_env_var);
     if (direct_addr != NULL && direct_addr[0] != 0) {
         Logger::with([] (auto& output) {
             output
                 << "Getting a server group alternative from environemnt "
                 << "variable "
-                << ServerGroup::direct_env_var
+                << ServerCoordination::direct_env_var
                 << std::endl;
         });
         addresses.insert(Address::parse(direct_addr));
