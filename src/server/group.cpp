@@ -78,6 +78,17 @@ std::set<Address> const &ServerGroup::server_addrs() const
     return this->servers;
 }
 
+ServerGroup::ElectionState ServerGroup::cur_election_state() const
+{
+    return this->election_state;
+}
+
+std::set<Address> ServerGroup::bullies() const
+{
+    auto iterator = this->servers.upper_bound(this->self);
+    return std::set<Address>(iterator, this->servers.cend());
+}
+
 void ServerGroup::serialize(Serializer& stream) const
 {
     stream << this->servers << this->coordinator;

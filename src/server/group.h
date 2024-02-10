@@ -30,10 +30,19 @@ class ServerListFailure {
 };
 
 class ServerGroup : public Serializable, public Deserializable {
+    public:
+        enum ElectionState {
+            ELECTED,
+            ELECTION_REQUIRED,
+            WAITING_RESULTS,
+            CANDIDATE
+        };
+
     private:
         std::set<Address> servers;
         Address self;
         std::optional<Address> coordinator;
+        ElectionState election_state;
 
     public:
         static constexpr char const *path_env_var = "SISOP2_SERVER_GROUP_FILE";
@@ -46,9 +55,13 @@ class ServerGroup : public Serializable, public Deserializable {
         bool add_server(Address server_addr);
         bool remove_server(Address server_addr);
         void elected(Address coordinator_addr);
+
         Address self_addr() const;
         std::optional<Address> coordinator_addr() const;
         std::set<Address> const &server_addrs() const;
+        ServerGroup::ElectionState cur_election_state() const;
+
+        std::set<Address> bullies() const;
 
         virtual void serialize(Serializer& stream) const;
         virtual void deserialize(Deserializer& stream);
