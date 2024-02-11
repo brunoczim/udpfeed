@@ -36,20 +36,20 @@ class InvalidAddrLen : public SocketError {
         virtual const char *what() const noexcept;
 };
 
-class Socket {
+class RawSocket {
     private:
         int sockfd;
         size_t max_message_size;
 
     public:
-        Socket(size_t max_message_size);
-        Socket(Address bind_addr, size_t max_message_size);
-        Socket(Socket&& other);
-        Socket(Socket const& other) = delete;
-        Socket& operator=(Socket const& obj) = delete;
-        Socket& operator=(Socket&& obj);
+        RawSocket(size_t max_message_size);
+        RawSocket(Address bind_addr, size_t max_message_size);
+        RawSocket(RawSocket&& other);
+        RawSocket(RawSocket const& other) = delete;
+        RawSocket& operator=(RawSocket const& obj) = delete;
+        RawSocket& operator=(RawSocket&& obj);
 
-        ~Socket();
+        ~RawSocket();
 
         Enveloped receive();
         std::optional<Enveloped> receive(int timeout_ms);
@@ -190,7 +190,7 @@ class ReliableSocket {
 
         class Inner {
             private:
-                Socket udp;
+                RawSocket udp;
                 Config config;
 
                 Channel<Enveloped>::Receiver handler_to_req_receiver;
@@ -200,7 +200,7 @@ class ReliableSocket {
 
             public:
                 Inner(
-                    Socket&& udp,
+                    RawSocket&& udp,
                     Config const& config,
                     Channel<Enveloped>::Receiver&& handler_to_req_receiver
                 );
@@ -304,7 +304,7 @@ class ReliableSocket {
         );
 
         ReliableSocket(
-            Socket&& udp,
+            RawSocket&& udp,
             Config const& config,
             Channel<Enveloped>&& input_to_handler_channel,
             Channel<Enveloped>&& handler_to_recv_req_channel
@@ -315,7 +315,7 @@ class ReliableSocket {
 
     public:
         ReliableSocket(
-            Socket&& udp,
+            RawSocket&& udp,
             Config const& config = Config()
         );
 

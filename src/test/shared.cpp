@@ -498,8 +498,8 @@ static TestSuite socket_test_suite()
 {
     return TestSuite()
         .test("basic send and receive", [] {
-            Socket client(500);
-            Socket server(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
+            RawSocket client(500);
+            RawSocket server(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
             Enveloped enveloped;
             enveloped.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
             enveloped.message;
@@ -540,8 +540,8 @@ static TestSuite socket_test_suite()
         })
 
         .test("full message workflow", [] {
-            Socket client(500);
-            Socket server(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
+            RawSocket client(500);
+            RawSocket server(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
 
             Enveloped request;
             request.remote = Address(make_ipv4({ 127, 0, 0, 1 }), 8082);
@@ -775,10 +775,10 @@ static TestSuite reliable_socket_test_suite()
 {
     return TestSuite()
         .test("one client, one server, single-threaded", [] () {
-            Socket client_udp(500);
+            RawSocket client_udp(500);
             ReliableSocket client(std::move(client_udp));
 
-            Socket server_udp(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
+            RawSocket server_udp(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
             ReliableSocket server(std::move(server_udp));
 
             Enveloped conn_req;
@@ -838,10 +838,10 @@ static TestSuite reliable_socket_test_suite()
         })
 
         .test("one client, one server, multi-threaded", [] () {
-            Socket client_udp(500);
+            RawSocket client_udp(500);
             ReliableSocket client(std::move(client_udp));
 
-            Socket server_udp(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
+            RawSocket server_udp(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
             ReliableSocket server(std::move(server_udp));
 
             std::thread server_thread([server = std::move(server)] () mutable {
@@ -906,7 +906,7 @@ static TestSuite reliable_socket_test_suite()
         })
 
         .test("multi client, multi-threaded", [] {
-            Socket server_udp(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
+            RawSocket server_udp(Address(make_ipv4({ 127, 0, 0, 1 }), 8082), 500);
             ReliableSocket server(std::move(server_udp));
 
             constexpr size_t thread_count = 4;
@@ -915,7 +915,7 @@ static TestSuite reliable_socket_test_suite()
 
             for (size_t i = 0; i < thread_count; i++) {
                 client_threads.push_back(std::move(std::thread([] () mutable {
-                    Socket client_udp(500);
+                    RawSocket client_udp(500);
                     ReliableSocket client(std::move(client_udp));
                     Enveloped conn_req;
                     conn_req.remote =
