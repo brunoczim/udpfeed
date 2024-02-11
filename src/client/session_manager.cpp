@@ -143,6 +143,7 @@ void start_client_session_manager(
             } catch (ChannelDisconnected const& exc) {
             }
         } catch (ChannelDisconnected const& exc) {
+
         } catch (CastOnMessageError const& exc) {
             Logger::with([] (auto& output) {
                 output << "!! Failed to connect !!" << std::endl;

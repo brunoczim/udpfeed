@@ -8,18 +8,9 @@
 #include "../shared/address.h"
 #include "../shared/serialization.h"
 #include "../shared/socket.h"
+#include "../shared/rms.h"
 
-class UnknownServerAddr {
-    private:
-        Address server;
-        std::string message;
-    public:
-        UnknownServerAddr(Address server_addr);
-        Address server_addr() const;
-        virtual char const *what() const noexcept;
-};
-
-class ServerListFailure {
+class ServerListFailure : public std::exception {
     private:
         std::string path_;
         std::string message;
@@ -29,11 +20,24 @@ class ServerListFailure {
         virtual char const *what() const noexcept;
 };
 
-class ServerGroup : public Serializable, public Deserializable {
+class SelfServerRemoved : public std::exception {
+    public:
+        virtual char const *what() const noexcept;
+};
+
+class ServerCoordination {
+    public:
+        enum ElectionState {
+            ELECTED,
+            ELECTION_REQUIRED,
+            WAITING_RESULTS,
+            CANDIDATE
+        };
+
     private:
-        std::set<Address> servers;
+        RmGroup group_;
         Address self;
-        std::optional<Address> coordinator;
+        ElectionState election_state;
 
     public:
         static constexpr char const *path_env_var = "SISOP2_SERVER_GROUP_FILE";
@@ -42,16 +46,16 @@ class ServerGroup : public Serializable, public Deserializable {
 
         static constexpr char const *default_path = ".sisop2_server_addrs";
 
-        ServerGroup(Address self);
-        bool add_server(Address server_addr);
-        bool remove_server(Address server_addr);
-        void elected(Address coordinator_addr);
-        Address self_addr() const;
-        std::optional<Address> coordinator_addr() const;
-        std::set<Address> const &server_addrs() const;
+        ServerCoordination(Address self);
+        ServerCoordination(Address self, RmGroup const& group);
 
-        virtual void serialize(Serializer& stream) const;
-        virtual void deserialize(Deserializer& stream);
+        RmGroup const& group() const;
+        Address self_addr() const;
+        ServerCoordination::ElectionState cur_election_state() const;
+        bool add_server(Address address);
+        bool remove_server(Address address);
+
+        std::set<Address> bullies() const;
 
         void connect(ReliableSocket& socket, char const *path = NULL);
 
