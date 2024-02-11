@@ -41,7 +41,7 @@ const char *InvalidAddrLen::what() const noexcept
     return this->message.c_str();
 }
 
-Socket::Socket(size_t max_message_size) : max_message_size(max_message_size)
+RawSocket::RawSocket(size_t max_message_size) : max_message_size(max_message_size)
 {
     this->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (this->sockfd < 0) {
@@ -49,8 +49,8 @@ Socket::Socket(size_t max_message_size) : max_message_size(max_message_size)
     }
 }
 
-Socket::Socket(Address bind_addr, size_t max_message_size) :
-    Socket(max_message_size)
+RawSocket::RawSocket(Address bind_addr, size_t max_message_size) :
+    RawSocket(max_message_size)
 {
     struct sockaddr_in native_bind_addr;
 
@@ -69,14 +69,14 @@ Socket::Socket(Address bind_addr, size_t max_message_size) :
     }
 }
 
-Socket::Socket(Socket&& other) :
+RawSocket::RawSocket(RawSocket&& other) :
     sockfd(other.sockfd),
     max_message_size(other.max_message_size)
 {
     other.sockfd = -1;
 }
 
-Socket& Socket::operator=(Socket&& other)
+RawSocket& RawSocket::operator=(RawSocket&& other)
 {
     if (this->sockfd != other.sockfd) {
         this->close();
@@ -87,12 +87,12 @@ Socket& Socket::operator=(Socket&& other)
     return *this;
 }
 
-Socket::~Socket()
+RawSocket::~RawSocket()
 {
     this->close();
 }
 
-Enveloped Socket::receive()
+Enveloped RawSocket::receive()
 {
     struct sockaddr_in sender_addr;
     socklen_t sender_len = sizeof(sender_addr);
@@ -110,7 +110,7 @@ Enveloped Socket::receive()
     }
     if (sender_len != sizeof(sender_addr)) {
         throw InvalidAddrLen(
-            "Socket address unexpectedly has the wrong length"
+            "RawSocket address unexpectedly has the wrong length"
         );
     }
 
@@ -128,7 +128,7 @@ Enveloped Socket::receive()
     return enveloped;
 }
 
-std::optional<Enveloped> Socket::receive(int timeout_ms)
+std::optional<Enveloped> RawSocket::receive(int timeout_ms)
 {
     struct pollfd fds[1];
     fds[0].fd = this->sockfd;
@@ -145,7 +145,7 @@ std::optional<Enveloped> Socket::receive(int timeout_ms)
     return std::optional<Enveloped>();
 }
 
-void Socket::send(Enveloped const& enveloped)
+void RawSocket::send(Enveloped const& enveloped)
 {
     std::ostringstream ostream;
     PlaintextSerializer serializer_impl(ostream);
@@ -174,7 +174,7 @@ void Socket::send(Enveloped const& enveloped)
     }
 }
 
-void Socket::close()
+void RawSocket::close()
 {
     if (this->sockfd >= 0) {
         ::close(this->sockfd);
@@ -271,7 +271,7 @@ ReliableSocket::Connection::Connection(Enveloped connect_request) :
 }
 
 ReliableSocket::Inner::Inner(
-    Socket&& udp,
+    RawSocket&& udp,
     Config const& config,
     Channel<Enveloped>::Receiver&& handler_to_req_receiver
 ) :
@@ -933,7 +933,7 @@ ReliableSocket::ReliableSocket(
 }
 
 ReliableSocket::ReliableSocket(
-    Socket&& udp,
+    RawSocket&& udp,
     Config const& config,
     Channel<Enveloped>&& input_to_handler_channel,
     Channel<Enveloped>&& handler_to_recv_req_channel
@@ -952,7 +952,7 @@ ReliableSocket::ReliableSocket(
 }
 
 ReliableSocket::ReliableSocket(
-    Socket&& udp,
+    RawSocket&& udp,
     Config const& config
 ) :
     ReliableSocket(
