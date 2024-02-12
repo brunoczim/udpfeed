@@ -64,7 +64,8 @@ Deserializer& operator>>(Deserializer& deserializer, MessageError& status);
 
 enum MessageStep {
     MSG_REQ,
-    MSG_RESP
+    MSG_RESP,
+    MSG_ACK
 };
 
 class InvalidMessageStep : public DeserializationError {
@@ -82,6 +83,7 @@ Serializer& operator<<(Serializer& serializer, MessageStep step);
 Deserializer& operator>>(Deserializer& deserializer, MessageStep &step);
 
 enum MessageType {
+    MSG_NOP,
     MSG_ERROR,
     MSG_CLIENT_CONN,
     MSG_SERVER_CONN,
@@ -165,6 +167,14 @@ class MessageBody : public Serializable, public Deserializable {
         T const& cast() const;
 
         virtual ~MessageBody();
+};
+
+class MessageNopAck : public MessageBody {
+    public:
+        virtual MessageTag tag() const;
+
+        virtual void serialize(Serializer& serializer) const;
+        virtual void deserialize(Deserializer& deserializer);
 };
 
 class MessageErrorResp : public MessageBody {
