@@ -34,7 +34,7 @@ int main(int argc, char const *argv[])
         output << "Binding to " << bind_address.to_string() << std::endl;
     });
 
-    RawSocket udp(arguments.bind_address, 1024);
+    Socket udp(arguments.bind_address, 1024);
     std::shared_ptr<ReliableSocket> socket(new ReliableSocket(std::move(udp)));
 
     Logger::with([&socket] (auto& output) {
