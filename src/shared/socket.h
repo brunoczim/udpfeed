@@ -198,6 +198,8 @@ class ReliableSocket {
                 std::mutex net_control_mutex;
                 std::map<Address, Connection> connections;
 
+                uint64_t election_counter;
+
             public:
                 Inner(
                     Socket&& udp,
@@ -238,6 +240,14 @@ class ReliableSocket {
                 std::vector<Enveloped> bump();
 
                 void disconnect();
+
+                void unsafe_set_election_counter(uint64_t counter);
+
+                uint64_t unsafe_get_election_counter() const;
+
+                void set_election_counter(uint64_t counter);
+
+                uint64_t get_election_counter();
         };
 
     public:
@@ -332,6 +342,10 @@ class ReliableSocket {
         void disconnect();
 
         void disconnect_timeout(uint64_t interval_nanos, uint64_t intervals);
+
+        uint64_t get_election_counter() const;
+
+        void set_election_counter(uint64_t counter);
 };
 
 #endif

@@ -2,49 +2,87 @@
 #define CLIENT_FRONTEND_H_ 1
 
 #include "../shared/socket.h"
+#include <set>
+
+class ClientCouldNotConnect : public std::exception {
+    public:
+        virtual char const *what() const noexcept;
+};
 
 class ClientFrontend {
+    private:
+        class Inner {
+            public:
+                ReliableSocket socket;
+                Username username;
+                RmGroup rms;
+
+                Inner(
+                    ReliableSocket&& socket,
+                    Username const& username,
+                    std::set<Address> const& rm_lookup_addrs
+                );
+
+            private:
+                bool try_connect(Address server_addr);
+        };
+
     public:
         class SentReq {
             private:
                 friend ClientFrontend;
 
-                Enveloped req_enveloped_;
-
-                ReliableSocket::SentReq impl;
+                std::shared_ptr<ClientFrontend::Inner> inner;
+                std::optional<ReliableSocket::SentReq> impl;
+                Enveloped req_enveloped;
 
                 SentReq(
-                    ReliableSocket::SentReq impl,
-                    Channel<Enveloped>::Receiver&& channel
+                    std::shared_ptr<ClientFrontend::Inner> const& inner,
+                    MessageBody const& request 
                 );
-            public:
-                Enveloped const& req_enveloped() const;
+                
+                void send();
 
-                Enveloped receive_resp() &&;
+            public:
+                Message const& req_message() const;
+
+                Message receive_resp() &&;
         };
 
         class ReceivedReq {
             private:
                 friend ClientFrontend;
 
+                std::shared_ptr<ClientFrontend::Inner> inner;
                 ReliableSocket::ReceivedReq impl;
                 Enveloped req_enveloped_;
 
                 ReceivedReq(
-                    ReliableSocket::ReceivedReq impl,
+                    std::shared_ptr<ClientFrontend::Inner> const& inner,
+                    ReliableSocket::ReceivedReq&& impl,
                     Enveloped req_enveloped
                 );
             public:
-                Enveloped const& req_enveloped() const;
+                MessageBody const& req_enveloped() const;
 
                 void send_resp(std::shared_ptr<MessageBody> const& response) &&;
         };
 
     private:
-        ReliableSocket socket;
+        std::shared_ptr<ClientFrontend::Inner> inner;
 
     public:
-        ClientFrontend(ReliableSocket&& socket);
+        ClientFrontend(
+            ReliableSocket&& socket,
+            Username const& username,
+            std::set<Address> const& rm_lookup_addrs
+        );
+
+        SentReq send_req(MessageBody const& message);
+        ReceivedReq receive_req();
+
+        void disconnect();
+        void disconnect_timeout(uint64_t interval_nanos, uint64_t intervals);
 };
 
 #endif

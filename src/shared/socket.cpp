@@ -277,7 +277,8 @@ ReliableSocket::Inner::Inner(
 ) :
     udp(std::move(udp)),
     config(config),
-    handler_to_req_receiver(std::move(handler_to_req_receiver))
+    handler_to_req_receiver(std::move(handler_to_req_receiver)),
+    election_counter(0)
 {
 }
 
@@ -314,6 +315,8 @@ void ReliableSocket::Inner::unsafe_send_req(
     std::optional<Channel<Enveloped>::Sender>&& callback
 )
 {
+    enveloped.message.header.election_counter =
+        this->unsafe_get_election_counter();
     enveloped.message.header.fill_req();
 
     if (this->connections.find(enveloped.remote) == this->connections.end()) {
@@ -325,9 +328,12 @@ void ReliableSocket::Inner::unsafe_send_req(
                     Connection(enveloped)
                 ));
                 break;
+
             case MSG_DISCONNECT: {
                 Enveloped response;
                 response.remote = enveloped.remote;
+                response.message.header.election_counter =
+                    this->unsafe_get_election_counter();
                 response.message.header.fill_resp(
                     enveloped.message.header.seqn
                 );
@@ -339,6 +345,11 @@ void ReliableSocket::Inner::unsafe_send_req(
                 if (moved_callback) {
                     moved_callback->send(response);
                 }
+                return;
+            }
+
+            default: {
+                auto moved_callback_ = std::move(callback);
                 return;
             }
         }
@@ -407,6 +418,8 @@ Enveloped ReliableSocket::Inner::unsafe_forceful_disconnect(Address remote)
     fake_req.message.body = std::shared_ptr<MessageBody>(
         new MessageDisconnectReq
     );
+    fake_req.message.header.election_counter =
+        this->unsafe_get_election_counter();
     fake_req.message.header.fill_req();
     return fake_req;
 }
@@ -460,6 +473,8 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
     if (enveloped.message.body->tag().type == MSG_PING) {
         Enveloped response;
         response.remote = enveloped.remote;
+        response.message.header.election_counter =
+            this->unsafe_get_election_counter();
         response.message.header.fill_resp(
             enveloped.message.header.seqn
         );
@@ -484,6 +499,8 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
             case MSG_DISCONNECT: {
                 Enveloped response;
                 response.remote = enveloped.remote;
+                response.message.header.election_counter =
+                    this->unsafe_get_election_counter();
                 response.message.header.fill_resp(
                     enveloped.message.header.seqn
                 );
@@ -497,6 +514,8 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
             default: {
                 Enveloped response;
                 response.remote = enveloped.remote;
+                response.message.header.election_counter =
+                    this->unsafe_get_election_counter();
                 response.message.header.fill_resp(
                     enveloped.message.header.seqn
                 );
@@ -609,6 +628,8 @@ std::vector<Enveloped> ReliableSocket::Inner::bump()
                 ping_request.message.body = std::shared_ptr<MessageBody>(
                     new MessagePingReq
                 );
+                ping_request.message.header.election_counter = 
+                    this->unsafe_get_election_counter();
                 ping_request.message.header.fill_req();
                 this->udp.send(ping_request);
             }
@@ -643,6 +664,28 @@ void ReliableSocket::Inner::disconnect()
         );
     }
     this->connections.clear();
+}
+
+void ReliableSocket::Inner::unsafe_set_election_counter(uint64_t counter)
+{
+    this->election_counter = counter;
+}
+
+uint64_t ReliableSocket::Inner::unsafe_get_election_counter() const
+{
+    return this->election_counter;
+}
+
+void ReliableSocket::Inner::set_election_counter(uint64_t counter)
+{
+    std::unique_lock lock(this->net_control_mutex);
+    this->unsafe_set_election_counter(counter);
+}
+
+uint64_t ReliableSocket::Inner::get_election_counter()
+{
+    std::unique_lock lock(this->net_control_mutex);
+    return this->unsafe_get_election_counter();
 }
 
 ReliableSocket::Config::Config() :
@@ -808,13 +851,15 @@ void ReliableSocket::ReceivedReq::send_resp(
     std::shared_ptr<MessageBody> const& response
 ) &&
 {
-    Enveloped envloped_resp;
-    envloped_resp.remote = this->req_enveloped_.remote;
-    envloped_resp.message.header.fill_resp(
+    Enveloped enveloped_resp;
+    enveloped_resp.remote = this->req_enveloped_.remote;
+    enveloped_resp.message.header.election_counter =
+        this->req_enveloped_.message.header.election_counter;
+    enveloped_resp.message.header.fill_resp(
         this->req_enveloped_.message.header.seqn
     );
-    envloped_resp.message.body = response;
-    this->inner->send_resp(envloped_resp);
+    enveloped_resp.message.body = response;
+    this->inner->send_resp(enveloped_resp);
 }
 
 ReliableSocket::DisconnectGuard::DisconnectGuard(
@@ -1035,4 +1080,14 @@ void ReliableSocket::disconnect_timeout(
         intervals--;
     }
     this->inner->disconnect();
+}
+
+uint64_t ReliableSocket::get_election_counter() const
+{
+    return this->inner->get_election_counter();
+}
+
+void ReliableSocket::set_election_counter(uint64_t counter)
+{
+    this->inner->set_election_counter(counter);
 }
