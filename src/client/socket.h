@@ -6,13 +6,21 @@
 
 class ClientSocket {
     private:
+        class PendingResponse {
+            public:
+                Enveloped enveloped;
+        };
+
+        class PendingAck {
+        };
+
         class Inner {
             public:
                 Socket udp;
                 uint64_t seqn;
-                SeqnSet pending_response;
-                SeqnSet pending_ack;
-                SeqnSet ack_sent;
+                std::map<uint64_t, PendingResponse> pending_resps;
+                std::map<uint64_t, PendingAck> pending_acks;
+                SeqnSet sent_acks;
                 RmGroup rms;
         };
 };
