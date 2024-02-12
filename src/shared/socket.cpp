@@ -538,7 +538,7 @@ std::optional<Enveloped> ReliableSocket::Inner::unsafe_handle_req(
         Enveloped response = std::get<1>(*resp_search);
         this->udp.send(response);
     } else if (
-        connection.received_seqn_set.receive(enveloped.message.header.seqn)
+        connection.received_seqn_set.add(enveloped.message.header.seqn)
     ) {
         return std::make_optional(enveloped);
     }
