@@ -14,7 +14,8 @@ class LinearCooldown {
         class Config {
             public:
                 uint64_t ticks_per_attempt;
-                uint64_t max_attempts;
+                uint64_t max_ticks;
+                uint64_t start_delay;
 
                 Config();
 

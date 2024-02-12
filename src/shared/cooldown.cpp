@@ -2,7 +2,8 @@
 
 LinearCooldown::Config::Config() :
     ticks_per_attempt(500),
-    max_attempts(5000)
+    max_ticks(5000),
+    start_delay(1000)
 {
 }
 
@@ -13,20 +14,23 @@ LinearCooldown LinearCooldown::Config::start() const
 
 LinearCooldown::LinearCooldown(Config const& config) :
     config(config),
-    counter(config.ticks_per_attempt * (config.max_attempts + 1))
+    counter(0)
 {
 }
 
 CooldownTick LinearCooldown::tick()
 {
-    if (this->counter == 0) {
+    if (this->counter >= this->config.max_ticks) {
         return COOLDOWN_DIED;
     }
 
-    this->counter--;
+    this->counter++;
     
-    if (this->counter % this->config.ticks_per_attempt == 0) {
-        return COOLDOWN_CYCLED;
+    if (this->counter >= this->config.start_delay) {
+        uint64_t ticks = this->counter - this->config.start_delay;
+        if (ticks % this->config.ticks_per_attempt == 0) {
+            return COOLDOWN_CYCLED;
+        }
     }
 
     return COOLDOWN_IDLE;
