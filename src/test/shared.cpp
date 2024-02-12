@@ -1234,169 +1234,472 @@ static TestSuite string_ext_test_suite()
 static TestSuite seqn_set_test_suite()
 {
     return TestSuite()
-        .test("initial receive zero twice", [] {
+        .test("initial add zero twice", [] {
             SeqnSet set;
             TEST_ASSERT(
-                "should receive",
-                set.receive(0)
+                "should add",
+                set.add(0)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(0)
+                "should not add",
+                !set.add(0)
+            );
+            TEST_ASSERT(
+                "should contain 0",
+                set.contains(0)
             );
         })
-        .test("initial receive two twice", [] {
+        .test("initial add two twice", [] {
             SeqnSet set;
             TEST_ASSERT(
-                "should receive",
-                set.receive(2)
+                "should add",
+                set.add(2)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(2)
+                "should not add",
+                !set.add(2)
             );
         })
         .test("mix two and zero", [] {
             SeqnSet set;
             TEST_ASSERT(
-                "should receive",
-                set.receive(0)
+                "should add",
+                set.add(0)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(2)
+                "should add",
+                set.add(2)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(0)
+                "should not add",
+                !set.add(0)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(2)
+                "should not add",
+                !set.add(2)
             );
         })
 
         .test("mix zero and two", [] {
             SeqnSet set;
             TEST_ASSERT(
-                "should receive",
-                set.receive(2)
+                "should add",
+                set.add(2)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(0)
+                "should add",
+                set.add(0)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(2)
+                "should not add",
+                !set.add(2)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(0)
+                "should not add",
+                !set.add(0)
+            );
+            TEST_ASSERT(
+                "should contain 0",
+                set.contains(0)
+            );
+            TEST_ASSERT(
+                "should contain 2",
+                set.contains(2)
             );
         })
 
         .test("merge zero and one and two", [] {
             SeqnSet set;
             TEST_ASSERT(
-                "should receive",
-                set.receive(2)
+                "should add",
+                set.add(2)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(0)
+                "should add",
+                set.add(0)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(1)
+                "should add",
+                set.add(1)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(1)
+                "should not add",
+                !set.add(1)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(2)
+                "should not add",
+                !set.add(2)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(0)
+                "should not add",
+                !set.add(0)
             );
         })
 
-        .test("receive many", [] {
+        .test("add many", [] {
             SeqnSet set;
             TEST_ASSERT(
-                "should receive",
-                set.receive(2)
+                "should add",
+                set.add(2)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(6)
+                "should add",
+                set.add(6)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(4)
+                "should add",
+                set.add(4)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(3)
+                "should add",
+                set.add(3)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(7)
+                "should add",
+                set.add(7)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(5)
+                "should add",
+                set.add(5)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(2)
+                "should not add",
+                !set.add(2)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(3)
+                "should not add",
+                !set.add(3)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(4)
+                "should not add",
+                !set.add(4)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(5)
+                "should not add",
+                !set.add(5)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(6)
+                "should not add",
+                !set.add(6)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(7)
+                "should not add",
+                !set.add(7)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(9)
+                "should add",
+                set.add(9)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(9)
+                "should not add",
+                !set.add(9)
             );
             TEST_ASSERT(
-                "should receive",
-                set.receive(8)
+                "should add",
+                set.add(8)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(8)
+                "should not add",
+                !set.add(8)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(9)
+                "should not add",
+                !set.add(9)
             );
             TEST_ASSERT(
-                "should not receive",
-                !set.receive(3)
+                "should not add",
+                !set.add(3)
+            );
+            TEST_ASSERT(
+                "should contain 2",
+                set.contains(2)
+            );
+            TEST_ASSERT(
+                "should contain 9",
+                set.contains(9)
+            );
+            TEST_ASSERT(
+                "should contain 7",
+                set.contains(7)
+            );
+            TEST_ASSERT(
+                "should contain 4",
+                set.contains(4)
+            );
+        })
+
+        .test("remove seqn splitting", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should add 2",
+                set.add(2)
+            );
+            TEST_ASSERT(
+                "should add 3",
+                set.add(3)
+            );
+            TEST_ASSERT(
+                "should add 4",
+                set.add(4)
+            );
+            TEST_ASSERT(
+                "should add 5",
+                set.add(5)
+            );
+            TEST_ASSERT(
+                "should remove 3",
+                set.remove(3)
+            );
+            TEST_ASSERT(
+                "should contain 2",
+                set.contains(2)
+            );
+            TEST_ASSERT(
+                "should not contain 3",
+                !set.contains(3)
+            );
+            TEST_ASSERT(
+                "should contain 5",
+                set.contains(5)
+            );
+            TEST_ASSERT(
+                "should contain 4",
+                set.contains(4)
+            );
+        })
+
+        .test("not remove seqn", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should add 2",
+                set.add(2)
+            );
+            TEST_ASSERT(
+                "should add 3",
+                set.add(3)
+            );
+            TEST_ASSERT(
+                "should add 4",
+                set.add(4)
+            );
+            TEST_ASSERT(
+                "should add 5",
+                set.add(5)
+            );
+            TEST_ASSERT(
+                "should not remove 0",
+                !set.remove(0)
+            );
+            TEST_ASSERT(
+                "should remove 3",
+                set.remove(3)
+            );
+            TEST_ASSERT(
+                "should not remove 3",
+                !set.remove(3)
+            );
+            TEST_ASSERT(
+                "should contain 2",
+                set.contains(2)
+            );
+            TEST_ASSERT(
+                "should not contain 3",
+                !set.contains(3)
+            );
+            TEST_ASSERT(
+                "should contain 5",
+                set.contains(5)
+            );
+            TEST_ASSERT(
+                "should contain 4",
+                set.contains(4)
+            );
+        })
+
+        .test("remove seqn below", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should add 0",
+                set.add(0)
+            );
+            TEST_ASSERT(
+                "should add 2",
+                set.add(2)
+            );
+            TEST_ASSERT(
+                "should add 3",
+                set.add(3)
+            );
+            TEST_ASSERT(
+                "should add 4",
+                set.add(4)
+            );
+            TEST_ASSERT(
+                "should add 5",
+                set.add(5)
+            );
+            TEST_ASSERT(
+                "should add 7",
+                set.add(7)
+            );
+            TEST_ASSERT(
+                "should remove 2",
+                set.remove(2)
+            );
+            TEST_ASSERT(
+                "should not contain 2",
+                !set.contains(2)
+            );
+            TEST_ASSERT(
+                "should contain 4",
+                set.contains(4)
+            );
+            TEST_ASSERT(
+                "should contain 5",
+                set.contains(5)
+            );
+            TEST_ASSERT(
+                "should contain 3",
+                set.contains(3)
+            );
+            TEST_ASSERT(
+                "should contain 0",
+                set.contains(0)
+            );
+            TEST_ASSERT(
+                "should contain 7",
+                set.contains(7)
+            );
+        })
+        
+        .test("remove seqn above", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should add 0",
+                set.add(0)
+            );
+            TEST_ASSERT(
+                "should add 2",
+                set.add(2)
+            );
+            TEST_ASSERT(
+                "should add 3",
+                set.add(3)
+            );
+            TEST_ASSERT(
+                "should add 4",
+                set.add(4)
+            );
+            TEST_ASSERT(
+                "should add 5",
+                set.add(5)
+            );
+            TEST_ASSERT(
+                "should add 7",
+                set.add(7)
+            );
+            TEST_ASSERT(
+                "should remove 5",
+                set.remove(5)
+            );
+            TEST_ASSERT(
+                "should not contain 5",
+                !set.contains(5)
+            );
+            TEST_ASSERT(
+                "should contain 4",
+                set.contains(4)
+            );
+            TEST_ASSERT(
+                "should contain 2",
+                set.contains(2)
+            );
+            TEST_ASSERT(
+                "should contain 3",
+                set.contains(3)
+            );
+            TEST_ASSERT(
+                "should contain 0",
+                set.contains(0)
+            );
+            TEST_ASSERT(
+                "should contain 7",
+                set.contains(7)
+            );
+        })
+
+        .test("remove seqn isolated", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should add 0",
+                set.add(0)
+            );
+            TEST_ASSERT(
+                "should add 3",
+                set.add(3)
+            );
+            TEST_ASSERT(
+                "should add 7",
+                set.add(7)
+            );
+            TEST_ASSERT(
+                "should remove 3",
+                set.remove(3)
+            );
+            TEST_ASSERT(
+                "should not contain 3",
+                !set.contains(3)
+            );
+            TEST_ASSERT(
+                "should contain 0",
+                set.contains(0)
+            );
+            TEST_ASSERT(
+                "should contain 7",
+                set.contains(7)
+            );
+        })
+
+        .test("missing below", [] {
+            SeqnSet set;
+            TEST_ASSERT(
+                "should add",
+                set.add(2)
+            );
+            TEST_ASSERT(
+                "should add",
+                set.add(6)
+            );
+            TEST_ASSERT(
+                "should add",
+                set.add(4)
+            );
+            TEST_ASSERT(
+                "should add",
+                set.add(3)
+            );
+            TEST_ASSERT(
+                "should add",
+                set.add(9)
+            );
+            TEST_ASSERT(
+                "should add",
+                set.add(5)
+            );
+
+            std::set<uint64_t> seqns = set.missing_below();
+
+            std::string actual;
+
+            for (auto seqn : seqns) {
+                actual += std::to_string(seqn) + " ";
+            }
+
+            std::set<uint64_t> expected { 0, 1, 7, 8 };
+
+            TEST_ASSERT(
+                "expected seqns, found: " + actual,
+                seqns == expected
             );
         })
     ;
