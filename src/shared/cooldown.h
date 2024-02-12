@@ -3,23 +3,37 @@
 
 #include <memory>
 
-class Cooldown {
+enum CooldownTick {
+    COOLDOWN_IDLE,
+    COOLDOWN_CYCLED,
+    COOLDOWN_DIED
+};
+
+class LinearCooldown {
     public:
         class Config {
             public:
-                virtual std::shared_ptr<Cooldown> start() const = 0;
-                virtual ~Config();
+                uint64_t ticks_per_attempt;
+                uint64_t max_attempts;
+
+                Config();
+
+                LinearCooldown start() const;
         };
 
-        virtual bool tick() = 0;
-        virtual bool alive() const = 0;
+    private:
+        LinearCooldown::Config config;
+        uint64_t counter;
 
-        virtual ~Cooldown();
+        LinearCooldown(Config const& config);
+
+    public:
+        CooldownTick tick();
 };
 
-class BinaryExpCooldown : public Cooldown {
+class BinaryExpCooldown {
     public:
-        class Config : public Cooldown::Config {
+        class Config {
             public:
                 uint64_t numer;
                 uint64_t denom;
@@ -27,7 +41,7 @@ class BinaryExpCooldown : public Cooldown {
 
                 Config();
 
-                virtual std::shared_ptr<Cooldown> start() const;
+                BinaryExpCooldown start() const;
         };
 
     private:
@@ -38,8 +52,7 @@ class BinaryExpCooldown : public Cooldown {
         BinaryExpCooldown(Config const& config);
 
     public:
-        virtual bool tick();
-        virtual bool alive() const;
+        CooldownTick tick();
 };
 
 #endif
