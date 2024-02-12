@@ -226,7 +226,7 @@ std::string MessageTag::to_string() const
 }
 
 
-MessageHeader::MessageHeader() : seqn(0), timestamp(0)
+MessageHeader::MessageHeader() : seqn(0), timestamp(0), election_counter(0)
 {
 }
 
@@ -245,12 +245,12 @@ void MessageHeader::fill_resp(uint64_t seqn)
 
 void MessageHeader::serialize(Serializer& serializer) const
 {
-    serializer << this->seqn << this->timestamp;
+    serializer << this->seqn << this->timestamp << this->election_counter;
 }
 
 void MessageHeader::deserialize(Deserializer& deserializer)
 {
-    deserializer >> this->seqn >> this->timestamp;
+    deserializer >> this->seqn >> this->timestamp >> this->election_counter;
 }
 
 CastOnMessageError::CastOnMessageError(MessageError error) :

@@ -133,6 +133,7 @@ class MessageHeader : public Serializable, public Deserializable {
     public:
         uint64_t seqn;
         int64_t timestamp;
+        uint64_t election_counter;
 
         MessageHeader();
 
