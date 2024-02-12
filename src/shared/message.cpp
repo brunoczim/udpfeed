@@ -274,6 +274,19 @@ MessageBody::~MessageBody()
 {
 }
 
+MessageTag MessageNopAck::tag() const
+{
+    return MessageTag(MSG_ACK, MSG_NOP);
+}
+
+void MessageNopAck::serialize(Serializer& serializer) const
+{
+}
+
+void MessageNopAck::deserialize(Deserializer& deserializer)
+{
+}
+
 MessageErrorResp::MessageErrorResp() : MessageErrorResp(MSG_INTERNAL_ERR)
 {
 }
