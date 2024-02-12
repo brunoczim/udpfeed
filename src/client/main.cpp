@@ -39,7 +39,7 @@ int main(int argc, char const *argv[])
     });
 
     ThreadTracker thread_tracker;
-    RawSocket udp(1024);
+    Socket udp(1024);
     std::shared_ptr<ReliableSocket> socket(new ReliableSocket(std::move(udp)));
 
     Logger::with([&socket] (auto& output) {
